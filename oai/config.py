@@ -8,6 +8,7 @@ different oai.toml.
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,17 +60,36 @@ class BaseXSettings:
 
 @dataclass(frozen=True)
 class SetRule:
-    """One way of deriving a setSpec from a record.
+    """One public OAI set, as an allow-list entry.
 
-    name    - human label, used in reports
-    xpath   - relative to the record (or absolute if it starts with /)
-    spec    - template for the setSpec; "{value}" is the extracted value.
-              Defaults to the raw value.
+    spec  - the setSpec published in OAI responses. Authored here, never
+            copied out of a record.
+    label - the setName shown by ListSets.
+    xpath - relative to the record; a record is in this set if the XPath
+            selects anything. Put value tests inside the XPath, e.g.
+            m:dataField[@name='ObjekttypTxt'][m:value='Musikinstrument'].
+
+    Because spec is written by hand and never taken from the data, an
+    internal group id or organisational unit cannot reach OAI output by
+    accident - and anything not named here is not harvestable at all.
     """
 
-    name: str
+    spec: str
+    label: str
     xpath: str
-    spec: str = "{value}"
+
+    def __post_init__(self) -> None:
+        if not SETSPEC_RE.match(self.spec):
+            raise ConfigError(
+                f"setSpec {self.spec!r} is not valid OAI setSpec syntax "
+                "(colon-separated tokens of A-Za-z0-9 _ - . ! ~ * ' ( ))"
+            )
+        if not self.label.strip():
+            raise ConfigError(f"set {self.spec!r} has an empty label")
+
+
+# OAI-PMH setSpec: colon-separated tokens, each of unreserved characters.
+SETSPEC_RE = re.compile(r"^[A-Za-z0-9_\-\.!~*'()]+(:[A-Za-z0-9_\-\.!~*'()]+)*$")
 
 
 @dataclass(frozen=True)
@@ -177,12 +197,15 @@ class Config:
 
         set_rules = tuple(
             SetRule(
-                name=s.get("name") or f"set{i}",
+                spec=s["spec"],
+                label=s.get("label", s["spec"]),
                 xpath=s["xpath"],
-                spec=s.get("spec", "{value}"),
             )
-            for i, s in enumerate(map_raw.get("sets", []))
+            for s in map_raw.get("sets", [])
         )
+        specs = [r.spec for r in set_rules]
+        if len(specs) != len(set(specs)):
+            raise ConfigError("duplicate setSpec in [mapping.sets]")
 
         mapping = Mapping(
             records=map_raw["records"],
@@ -193,11 +216,6 @@ class Config:
             namespaces=namespaces,
             sets=set_rules,
         )
-        for rule in mapping.sets:
-            if "{value}" not in rule.spec:
-                raise ConfigError(
-                    f"set rule {rule.name!r} spec must contain {{value}}"
-                )
 
         return cls(identity=identity, basex=basex, mapping=mapping)
 

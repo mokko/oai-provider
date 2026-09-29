@@ -50,35 +50,23 @@ class QueryBuilder:
     # -- pieces -----------------------------------------------------------
 
     @staticmethod
-    def _spec_expr(spec: str) -> str:
-        """Turn a setSpec template into an XQuery expression.
-
-        "{value}" alone is the common case; anything else is a prefix/suffix
-        template and has to become a concat, not a string pasted next to the
-        substring - "group-{value}" is not the function group-string().
-        """
-        if spec == "{value}":
-            return "string($v)"
-        head, _, tail = spec.partition("{value}")
-        pieces = []
-        if head:
-            pieces.append(f"'{head.replace(chr(39), '&apos;')}'")
-        pieces.append("string($v)")
-        if tail:
-            pieces.append(f"'{tail.replace(chr(39), '&apos;')}'")
-        return "concat(" + ", ".join(pieces) + ")"
+    def _spec_literal(spec: str) -> str:
+        return "'" + spec.replace("'", "&apos;") + "'"
 
     def set_expressions(self) -> str:
-        """One XQuery expression per set rule, producing setSpec strings."""
+        """One allow-list test per declared set.
+
+        The XPath is a membership predicate and its value is ignored: the
+        setSpec is the string we wrote in config, so nothing from the record
+        can appear in OAI output.
+        """
         if not self.mapping.sets:
             return ""
-        parts = []
-        for rule in self.mapping.sets:
-            path = self.mapping.resolve(rule.xpath)
-            parts.append(
-                f"for $v in {path}"
-                f" return normalize-space({self._spec_expr(rule.spec)})"
-            )
+        parts = [
+            f"if (exists({self.mapping.resolve(rule.xpath)})) "
+            f"then {self._spec_literal(rule.spec)} else ()"
+            for rule in self.mapping.sets
+        ]
         return ",\n    ".join(parts)
 
     def identifier_expr(self) -> str:

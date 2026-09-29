@@ -43,11 +43,24 @@ datestamp = "m:systemField[@name='__lastModified']/m:value"
 # They must be shifted to UTC, not merely labelled "Z".
 timezoneOffset = "+02:00"
 
-[[mapping.sets]]
-name = "orgUnit"
-xpath = "m:systemField[@name='__orgUnit']/m:value"
+# Sets are an explicit allow-list: only what is named here is exposed, and
+# the setSpec is a label we choose - never a value taken out of a record.
+# A record is in the set when its XPath selects anything. Internal group ids
+# and organisational units therefore cannot reach OAI output by accident,
+# and an internal group that is not listed is not harvestable at all.
+#
+# __orgUnit is an organisational unit, not a set, and must not be published
+# as one. The group ids below are from the synthetic sample file.
 
 [[mapping.sets]]
-name = "objectGroup"
-xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem/@moduleItemId"
-spec = "group-{value}"
+spec = "mimo"
+label = "Musikinstrumente"
+xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
+
+[[mapping.sets]]
+spec = "78"
+label = "Schellackplatten"
+xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='78']"
+
+# Value tests belong inside the XPath, e.g.:
+#   xpath = "m:dataField[@name='ObjekttypTxt'][m:value='Musikinstrument']"

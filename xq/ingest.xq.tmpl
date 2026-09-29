@@ -34,6 +34,8 @@ return if ({{IDENTIFIER_EXPR}} ne '' and $datestamp) then
         {{ENVELOPE_PREFIX}}:datestamp="{$datestamp}"
         {{ENVELOPE_PREFIX}}:seen="{$dumpId}">
       { for $s in $sets return <{{ENVELOPE_PREFIX}}:set>{$s}</{{ENVELOPE_PREFIX}}:set> }
+      (: The source element, unaltered. Nothing is filtered: what Zetcom
+         emitted is what gets stored and served. :)
       <{{ENVELOPE_PREFIX}}:source>{$r}</{{ENVELOPE_PREFIX}}:source>
     </{{ENVELOPE_PREFIX}}:record>,
     concat(replace($identifier, '[^A-Za-z0-9._-]', '_'), '.xml'))

@@ -23,7 +23,11 @@ def test_loads_the_real_config(config: Config) -> None:
     assert config.mapping.identifier == "@id"
     assert config.mapping.identifier_prefix == "spk-berlin.de:EM-objId-"
     assert config.identity.deleted_record == "persistent"
-    assert {r.name for r in config.mapping.sets} == {"orgUnit", "objectGroup"}
+    assert {r.spec for r in config.mapping.sets} == {"mimo", "78"}
+    assert {r.label for r in config.mapping.sets} == {
+        "Musikinstrumente",
+        "Schellackplatten",
+    }
 
 
 def test_password_comes_from_env_when_set(monkeypatch, tmp_path) -> None:
@@ -101,20 +105,43 @@ def test_user_supplied_values_are_variables_not_query_text(config: Config) -> No
     assert "spk-berlin.de" not in q
 
 
-def test_set_spec_template_becomes_xquery(config: Config) -> None:
+def test_sets_are_authored_labels_not_record_values(config: Config) -> None:
+    """The security property: the setSpec is the string we wrote, so no
+    value from a record - internal group id, org unit - can appear in OAI
+    output, and an unlisted group is not harvestable."""
     exprs = QueryBuilder(config.mapping).set_expressions()
-    assert "concat('group-', string($v))" in exprs
-    assert "normalize-space(string($v))" in exprs
+    assert "then 'mimo' else ()" in exprs
+    assert "then '78' else ()" in exprs
+    assert "exists(" in exprs
+    # no value ever flows from the record into a setSpec
+    assert "string($v)" not in exprs
+    assert "concat(" not in exprs
 
 
-def test_set_rule_without_placeholder_is_rejected(tmp_path) -> None:
-    text = (ROOT / "oai.toml").read_text().replace(
-        'spec = "group-{value}"', 'spec = "group"'
-    )
+def test_invalid_setspec_is_rejected(config: Config) -> None:
+    with pytest.raises(ConfigError, match="setSpec"):
+        SetRule(spec="not valid!", label="nope", xpath="x")
+
+
+def test_duplicate_setspec_is_rejected(tmp_path) -> None:
+    text = (ROOT / "oai.toml").read_text().replace('spec = "78"', 'spec = "mimo"')
     bad = tmp_path / "bad.toml"
     bad.write_text(text)
-    with pytest.raises(ConfigError, match="must contain"):
+    with pytest.raises(ConfigError, match="duplicate"):
         Config.load(bad)
+
+
+def test_payload_is_stored_unaltered(config: Config) -> None:
+    """Explicit decision: the internal XML is stored and served verbatim.
+
+    Nothing is filtered out, so no transform/filter step may appear in the
+    ingest query without that decision being revisited.
+    """
+    q = QueryBuilder(config.mapping).ingest_query()
+    assert "<env:source>{$r}</env:source>" in q
+    assert "copy $c" not in q
+    assert "delete node" not in q
+    assert "PAYLOAD_EXPR" not in q
 
 
 def test_deleted_record_policy_reaches_the_reconcile_query(config: Config) -> None:

@@ -54,6 +54,38 @@ liveness to the source.
 The dump id is a content hash, so re-running an unchanged dump is idempotent
 and cannot be mistaken for a dump that lost records.
 
+## Sets
+
+Sets are an **explicit allow-list** (`[[mapping.sets]]`). Each entry pairs an
+XPath with a string label:
+
+```toml
+[[mapping.sets]]
+spec  = "mimo"                 # setSpec published to harvesters
+label = "Musikinstrumente"     # setName shown by ListSets
+xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
+```
+
+A record is in the set when its XPath selects anything; value tests belong
+inside the XPath (`m:dataField[@name='X'][m:value='Y']`).
+
+Two consequences worth being deliberate about:
+
+- **The setSpec is written by hand and never taken from a record.** No
+  internal group id or organisational unit can reach OAI output by accident,
+  and a group that is not listed here is not harvestable at all.
+- `__orgUnit` is an organisational unit, not a set, and is not published as
+  one.
+
+ListSets needs no database query — the specs and labels come straight from
+the config, which is what keeps the allow-list authoritative.
+
+## Payload
+
+The stored payload is the source record element **verbatim** — no filtering,
+no omissions. `tests/test_ingest_basex.py` asserts each stored payload
+`deep-equal`s the `moduleItem` it came from, so this cannot drift silently.
+
 ## Mapping notes that cost real round trips
 
 - **A prefix used in a query resolves against the query's prolog**, never

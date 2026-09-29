@@ -26,6 +26,7 @@ let $rows :=
             identifier="{concat($idPrefix, $id)}"
             datestamp="{$datestamp}"
             sets="{string-join($sets, ' ')}"
+            payloadChildren="{count($r/*)}"
             storable="{($id ne '' and $datestamp) cast as xs:boolean}"/>
 
 return

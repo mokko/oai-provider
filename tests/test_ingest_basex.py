@@ -128,15 +128,49 @@ def test_datestamp_is_shifted_to_utc_not_relabelled(cfg: Config) -> None:
     assert got["spk-berlin.de:EM-objId-1002"]["ds"] == "2026-08-01T07:00:00Z"
 
 
-def test_sets_come_from_org_unit_and_object_groups(cfg: Config) -> None:
+def test_sets_are_the_configured_labels_only(cfg: Config) -> None:
     ingest(cfg, SAMPLE)
     got = headers(cfg)
-    assert got["spk-berlin.de:EM-objId-1001"]["sets"] == (
-        "EM-Süd- und Südostasien,group-6054"
-    )
-    # 1003 has no __orgUnit and no group reference: sets must be empty, not
-    # an empty string masquerading as a set.
+    # 'mimo' and '78' are authored labels, not values lifted from the record
+    assert got["spk-berlin.de:EM-objId-1001"]["sets"] == "mimo"
+    assert got["spk-berlin.de:EM-objId-1002"]["sets"] == "78"
+    # 1003 carries no group reference: no sets, and not an empty string
+    # masquerading as one
     assert got["spk-berlin.de:EM-objId-1003"]["sets"] == ""
+
+
+def test_stored_payload_is_the_source_element_unaltered(cfg: Config) -> None:
+    """Explicit decision: nothing is filtered out.
+
+    Every stored payload must deep-equal the moduleItem it came from -
+    internal group references and organisational units included.
+    """
+    ingest(cfg, SAMPLE)
+
+    async def go() -> str:
+        async with _client(cfg) as bx:
+            return await bx.query(
+                f'declare namespace env = "{ENVELOPE_NS}";\n'
+                f'declare namespace m = "http://www.zetcom.com/ria/ws/module";\n'
+                f"declare variable $path external;\n"
+                f"declare variable $idPrefix external;\n"
+                f"let $doc := parse-xml(file:read-text($path))\n"
+                f"let $src := $doc/m:application/m:modules/m:module"
+                f"[@name='Object']/m:moduleItem\n"
+                f"let $stored := collection({cfg.basex.database!r})/env:record\n"
+                f"let $mismatched := count(\n"
+                f"  for $r in $src\n"
+                f"  let $p := $stored[@env:identifier = "
+                f"concat($idPrefix, string($r/@id))]/env:source/m:moduleItem\n"
+                f"  where count($p) ne 1 or not(deep-equal($p, $r))\n"
+                f"  return $r)\n"
+                f"return string-join((count($src), count($stored), $mismatched), ' ')",
+                path=str(SAMPLE),
+                idPrefix=cfg.mapping.identifier_prefix,
+            )
+
+    result = asyncio.run(go()).strip()
+    assert result == "3 3 0", f"source/stored/mismatched = {result}"
 
 
 def test_payload_keeps_its_namespace(cfg: Config) -> None:
@@ -316,12 +350,11 @@ def test_stripped_dump_behaves_identically(cfg: Config, tmp_path) -> None:
         timezone_offset=cfg.mapping.timezone_offset,
         namespaces={},
         sets=(
-            SetRule("orgUnit", "systemField[@name='__orgUnit']/value"),
             SetRule(
-                "objectGroup",
-                "moduleReference[@name='ObjObjectGroupsRef']"
-                "/moduleReferenceItem/@moduleItemId",
-                spec="group-{value}",
+                spec="mimo",
+                label="Musikinstrumente",
+                xpath="moduleReference[@name='ObjObjectGroupsRef']"
+                "/moduleReferenceItem[@moduleItemId='6054']",
             ),
         ),
     )
@@ -339,6 +372,4 @@ def test_stripped_dump_behaves_identically(cfg: Config, tmp_path) -> None:
         "spk-berlin.de:EM-objId-1003",
     }
     assert got["spk-berlin.de:EM-objId-1001"]["ds"] == "2026-09-19T06:15:00Z"
-    assert got["spk-berlin.de:EM-objId-1001"]["sets"] == (
-        "EM-Süd- und Südostasien,group-6054"
-    )
+    assert got["spk-berlin.de:EM-objId-1001"]["sets"] == "mimo"
