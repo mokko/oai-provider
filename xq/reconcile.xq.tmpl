@@ -1,0 +1,43 @@
+(: Reconcile a full dump against what is stored: the deletion pass.
+
+   The source system does not record deletes, and a sync that only adds or
+   overwrites will serve vanished objects as live forever. But the dump is
+   complete, so absence IS the delete signal: every record we stored carries
+   the dump id it was last seen in, and anything not seen this run is gone.
+
+   policy=persistent -> keep a metadata-less tombstone (OAI status="deleted")
+   policy=transient  -> remove the document entirely
+   policy=no         -> do nothing (the source is the authority on liveness)
+
+   Updating query: stores/removes and returns nothing.
+:)
+{{NAMESPACES}}
+
+declare variable $db external;
+declare variable $dumpId external;
+declare variable $now external;
+declare variable $policy external;
+
+let $stale :=
+  for $d in collection($db)
+  (: not(@seen = $dumpId), NOT @seen ne $dumpId: comparing a missing
+     attribute yields the empty sequence, which is falsy, so a record that
+     never carried a seen stamp would be invisible here forever. That is
+     exactly the case when adopting an existing database. :)
+  where not($d/{{ENVELOPE_PREFIX}}:record/@{{ENVELOPE_PREFIX}}:seen = $dumpId)
+  return $d
+
+return
+  if ($policy = 'persistent') then
+    for $d in $stale
+    return db:put($db,
+      <{{ENVELOPE_PREFIX}}:record
+          {{ENVELOPE_PREFIX}}:identifier="{$d/{{ENVELOPE_PREFIX}}:record/@{{ENVELOPE_PREFIX}}:identifier}"
+          {{ENVELOPE_PREFIX}}:datestamp="{$now}"
+          {{ENVELOPE_PREFIX}}:status="deleted"
+          {{ENVELOPE_PREFIX}}:seen="{$dumpId}"/>,
+      db:path($d))
+  else if ($policy = 'transient') then
+    for $d in $stale
+    return db:delete($db, db:path($d))
+  else ()

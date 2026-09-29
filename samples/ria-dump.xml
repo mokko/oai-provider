@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<application xmlns="http://www.zetcom.com/ria/ws/module">
+  <modules>
+    <module name="Object" totalSize="3">
+      <moduleItem hasAttachments="true" id="1001" uuid="u-1001">
+        <systemField dataType="Long" name="__id">
+          <value>1001</value>
+        </systemField>
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-09-19 08:15:00.0</value>
+          <formattedValue language="de">19/09/2026 08:15</formattedValue>
+        </systemField>
+        <systemField dataType="Varchar" name="__orgUnit">
+          <value>EM-Süd- und Südostasien</value>
+        </systemField>
+        <dataField dataType="Varchar" name="ObjObjectNumberTxt">
+          <value>EM-1001</value>
+        </dataField>
+        <dataField dataType="Varchar" name="ObjDateTxt">
+          <value>um 1900</value>
+        </dataField>
+        <dataField dataType="Clob" name="ObjObjectTitleClb">
+          <value>Trommel aus Ghana</value>
+        </dataField>
+        <repeatableGroup name="ObjObjectGroupsRef" size="1">
+          <repeatableGroupItem id="7001" uuid="u-7001">
+            <dataField dataType="Varchar" name="ObjObjectGroupsNameTxt">
+              <value>Musikinstrumente</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <moduleReference name="ObjObjectGroupsRef">
+          <moduleReferenceItem moduleItemId="6054" uuid="u-6054"/>
+        </moduleReference>
+      </moduleItem>
+
+      <moduleItem hasAttachments="false" id="1002" uuid="u-1002">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-08-01 09:00:00.0</value>
+        </systemField>
+        <systemField dataType="Varchar" name="__orgUnit">
+          <value>EM-Phonogramm-Archiv</value>
+        </systemField>
+        <dataField dataType="Varchar" name="ObjObjectNumberTxt">
+          <value>EM-1002</value>
+        </dataField>
+        <moduleReference name="ObjObjectGroupsRef">
+          <moduleReferenceItem moduleItemId="78" uuid="u-78"/>
+        </moduleReference>
+      </moduleItem>
+
+      <moduleItem hasAttachments="false" id="1003" uuid="u-1003">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-07-02 12:30:45.5</value>
+        </systemField>
+        <dataField dataType="Varchar" name="ObjObjectNumberTxt">
+          <value>EM-1003</value>
+        </dataField>
+      </moduleItem>
+    </module>
+  </modules>
+</application>
