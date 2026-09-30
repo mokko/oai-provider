@@ -12,6 +12,7 @@ external variable, so it cannot break out of the query.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from .config import ENVELOPE_PREFIX, Mapping
@@ -110,3 +111,30 @@ class QueryBuilder:
 
     def stale_query(self) -> str:
         return self.render("stale.xq.tmpl")
+
+    def page_query(self) -> str:
+        return self.render("page.xq.tmpl")
+
+    def count_query(self) -> str:
+        return self.render("count.xq.tmpl")
+
+    def record_query(self) -> str:
+        return self.render("record.xq.tmpl")
+
+    def fingerprint(self) -> str:
+        """A digest of the mapping, so a resumption token issued under one
+        mapping is not honoured under another.
+
+        Changing this is exactly the case the token fingerprint exists to
+        catch: the same request arguments stop meaning the same result set.
+        """
+        parts = [
+            self.mapping.records,
+            self.mapping.identifier,
+            self.mapping.identifier_prefix,
+            self.mapping.datestamp,
+            self.mapping.timezone_offset,
+            ",".join(f"{p}={u}" for p, u in sorted(self.mapping.namespaces.items())),
+            ";".join(f"{r.spec}|{r.xpath}" for r in self.mapping.sets),
+        ]
+        return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]

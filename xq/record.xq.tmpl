@@ -1,0 +1,23 @@
+(: One record by identifier, for GetRecord. Returns nothing if absent, so
+   the caller can raise idDoesNotExist. A tombstone yields the header with no
+   payload - GetRecord for a deleted record must not invent metadata.
+:)
+{{NAMESPACES}}
+
+declare variable $db external;
+declare variable $identifier external;
+
+let $r := collection($db)/{{ENVELOPE_PREFIX}}:record[
+    @{{ENVELOPE_PREFIX}}:identifier = $identifier]
+
+return
+  if (empty($r)) then ()
+  else
+    <row datestamp="{$r/@{{ENVELOPE_PREFIX}}:datestamp}"
+         identifier="{$r/@{{ENVELOPE_PREFIX}}:identifier}"
+         status="{string($r/@{{ENVELOPE_PREFIX}}:status)}"
+         sets="{string-join($r/{{ENVELOPE_PREFIX}}:set, ' ')}">{
+      if (string($r/@{{ENVELOPE_PREFIX}}:status) ne 'deleted')
+      then $r/{{ENVELOPE_PREFIX}}:source/node()
+      else ()
+    }</row>

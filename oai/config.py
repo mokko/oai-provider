@@ -131,10 +131,35 @@ class Mapping:
 
 
 @dataclass(frozen=True)
+class ProtocolSettings:
+    page_size: int = 100
+    token_ttl: int = 86400
+    token_secret: str = ""
+    from_env: bool = False
+
+
+@dataclass(frozen=True)
+class MetadataFormat:
+    """A format we can disseminate.
+
+    kind="passthrough" serves the stored payload verbatim inside <metadata>.
+    A derived format (oai_dc assembled from XPaths) is not implemented - that
+    is still an open decision.
+    """
+
+    prefix: str
+    namespace: str
+    schema: str = ""
+    kind: str = "passthrough"
+
+
+@dataclass(frozen=True)
 class Config:
     identity: Identity
     basex: BaseXSettings
     mapping: Mapping
+    protocol: ProtocolSettings = field(default_factory=ProtocolSettings)
+    formats: tuple[MetadataFormat, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> Config:
@@ -217,7 +242,46 @@ class Config:
             sets=set_rules,
         )
 
-        return cls(identity=identity, basex=basex, mapping=mapping)
+        proto_raw = raw.get("protocol", {})
+        secret_env = os.environ.get("OAI_TOKEN_SECRET")
+        secret = secret_env or proto_raw.get("tokenSecret", "")
+        protocol = ProtocolSettings(
+            page_size=int(proto_raw.get("pageSize", 100)),
+            token_ttl=int(proto_raw.get("tokenTTL", 86400)),
+            token_secret=secret,
+            from_env=bool(secret_env),
+        )
+        if protocol.page_size < 1:
+            raise ConfigError("protocol.pageSize must be >= 1")
+
+        formats = tuple(
+            MetadataFormat(
+                prefix=f["prefix"],
+                namespace=f["namespace"],
+                schema=f.get("schema", ""),
+                kind=f.get("kind", "passthrough"),
+            )
+            for f in raw.get("metadata", {}).get("formats", [])
+        )
+        for fmt in formats:
+            if fmt.kind != "passthrough":
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r}: kind {fmt.kind!r} is not "
+                    "implemented yet (only 'passthrough')"
+                )
+        if not formats:
+            raise ConfigError(
+                "no [[metadata.formats]] configured: a repository must "
+                "advertise at least one"
+            )
+
+        return cls(
+            identity=identity,
+            basex=basex,
+            mapping=mapping,
+            protocol=protocol,
+            formats=formats,
+        )
 
 
 def _must(section: dict, key: str) -> str:

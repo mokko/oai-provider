@@ -64,3 +64,24 @@ xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@mo
 
 # Value tests belong inside the XPath, e.g.:
 #   xpath = "m:dataField[@name='ObjekttypTxt'][m:value='Musikinstrument']"
+
+[protocol]
+pageSize = 100
+# resumption tokens expire, which is what replaces server-side eviction
+tokenTTL = 86400
+# DEV PLACEHOLDER. Prefer OAI_TOKEN_SECRET. Without a secret tokens are
+# unsigned, so they cannot be trusted to be untampered - fine for local
+# development, not for exposure.
+tokenSecret = "dev-token-secret-change-me"
+
+# Metadata formats to advertise. Only "passthrough" is implemented: the
+# stored payload is served verbatim inside <metadata>, which is why the
+# metadata namespace is Zetcom's.
+#
+# NOTE: no oai_dc. Deriving Dublin Core would need a field-by-field mapping
+# (title, creator, date, rights ...) and that decision has not been made yet.
+[[metadata.formats]]
+prefix = "ria"
+namespace = "http://www.zetcom.com/ria/ws/module"
+schema = ""
+kind = "passthrough"

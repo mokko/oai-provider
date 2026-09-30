@@ -1,0 +1,58 @@
+(: One page of ListIdentifiers / ListRecords.
+
+   Paging is a keyset cursor on (datestamp, identifier), not an offset, and
+   the pair has to be a TOTAL order: datestamp alone is not unique (the real
+   MuseumPlus data has records sharing a second), and a cursor that is not
+   unique either skips the peers or repeats them. Skipping is the dangerous
+   one - the harvest still ends with an empty page, so the harvester believes
+   it is complete.
+
+   $until is pinned on the first page and carried in the resumption token, so
+   a re-ingest during a harvest cannot move a record across a page boundary.
+:)
+{{NAMESPACES}}
+
+declare option output:indent "no";
+
+declare variable $db external;
+declare variable $set external;
+declare variable $from external;
+declare variable $until external;
+declare variable $afterDs external;
+declare variable $afterId external;
+(: typed: external variables arrive as untyped strings, so $limit + 1 would
+   otherwise fail with "Arithmetics not defined for xs:string and xs:integer".
+   Declaring the type makes BaseX cast on bind, and rejects a bad binding
+   early instead of silently comparing as text. :)
+declare variable $limit as xs:integer external;
+declare variable $withPayload external;
+
+let $matching :=
+  for $r in collection($db)/{{ENVELOPE_PREFIX}}:record
+  where ($from = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp ge $from)
+    and ($until = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp le $until)
+    and ($set = '' or $r/{{ENVELOPE_PREFIX}}:set = $set)
+    and ($afterDs = ''
+         or $r/@{{ENVELOPE_PREFIX}}:datestamp gt $afterDs
+         or ($r/@{{ENVELOPE_PREFIX}}:datestamp eq $afterDs
+             and $r/@{{ENVELOPE_PREFIX}}:identifier gt $afterId))
+  order by $r/@{{ENVELOPE_PREFIX}}:datestamp ascending,
+           $r/@{{ENVELOPE_PREFIX}}:identifier ascending
+  return $r
+
+(: limit + 1, so the caller can tell whether another page exists without a
+   second query. :)
+return
+  <page>{
+    for $r in subsequence($matching, 1, $limit + 1)
+    return
+      <row datestamp="{$r/@{{ENVELOPE_PREFIX}}:datestamp}"
+           identifier="{$r/@{{ENVELOPE_PREFIX}}:identifier}"
+           status="{string($r/@{{ENVELOPE_PREFIX}}:status)}"
+           sets="{string-join($r/{{ENVELOPE_PREFIX}}:set, ' ')}">{
+        if ($withPayload = 'true' and
+            string($r/@{{ENVELOPE_PREFIX}}:status) ne 'deleted')
+        then $r/{{ENVELOPE_PREFIX}}:source/node()
+        else ()
+      }</row>
+  }</page>

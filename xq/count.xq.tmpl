@@ -1,0 +1,16 @@
+(: completeListSize for the pinned query, ignoring the cursor: the size of
+   the whole result set the token belongs to, not of the current page.
+:)
+{{NAMESPACES}}
+
+declare variable $db external;
+declare variable $set external;
+declare variable $from external;
+declare variable $until external;
+
+count(
+  for $r in collection($db)/{{ENVELOPE_PREFIX}}:record
+  where ($from = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp ge $from)
+    and ($until = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp le $until)
+    and ($set = '' or $r/{{ENVELOPE_PREFIX}}:set = $set)
+  return $r)
