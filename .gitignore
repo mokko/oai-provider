@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Museum data samples. Large (a single RIA chunk is ~200 MB unpacked) and not
+# ours to publish, so **nothing in here is ever committed or pushed**. The
+# directory is expected to exist locally and to stay out of git entirely.
+sdata/
