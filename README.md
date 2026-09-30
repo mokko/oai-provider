@@ -1,8 +1,7 @@
 # oai-provider
 
-An OAI-PMH data provider backend, BaseX as the store. This repo currently
-contains the **ingest path only** — the protocol layer (the six verbs,
-resumption tokens) is not written yet.
+An OAI-PMH data provider backend, BaseX as the store. It ingests a multi-record
+XML dump into an envelope per record, and serves the six OAI verbs from it.
 
 ## Shape
 
@@ -16,9 +15,8 @@ resumption tokens) is not written yet.
   in-process with the data — no lxml (a wheel risk on 3.14/arm64), and no
   `xml.etree` XPath-1.0 subset either. Python generates the query text and
   reports the result.
-- **Async Python** (Starlette + httpx later). The concurrency lives in the
-  HTTP layer and the connection pool; the query work happens in Java, off the
-  event loop.
+- **Async Python** (Starlette + httpx). The concurrency lives in the HTTP layer
+  and the connection pool; the query work happens in Java, off the event loop.
 
 ## Ingest
 
@@ -86,6 +84,58 @@ The stored payload is the source record element **verbatim** — no filtering,
 no omissions. `tests/test_ingest_basex.py` asserts each stored payload
 `deep-equal`s the `moduleItem` it came from, so this cannot drift silently.
 
+## Serving
+
+```bash
+OAI_BASEX_PASSWORD=... .venv/bin/python -m uvicorn oai.app:app --factory --port 8000
+curl 'http://localhost:8000/oai?verb=Identify'
+```
+
+`GET /oai` and `POST /oai` reach the same handler, as the spec requires, and a
+test asserts the two produce the same body. `GET /healthz` reports whether BaseX
+answers.
+
+All six verbs are implemented (Identify, ListMetadataFormats, ListSets,
+GetRecord, ListIdentifiers, ListRecords) with the error codes customarily
+expected: badArgument, badVerb, cannotDisseminateFormat, idDoesNotExist,
+noRecordsMatch, badResumptionToken, noSetHierarchy.
+
+### Resumption tokens
+
+Stateless and signed, so a restart cannot invalidate a harvest in progress —
+which the earlier Perl provider's in-memory chunk cache could not survive.
+
+- The cursor is the pair **(datestamp, identifier)**, a total order. A datestamp
+  alone is not unique, and a non-unique cursor either skips the peers or repeats
+  them. Skipping is the dangerous one: the harvest still ends on an empty page,
+  so the harvester believes it finished. There is a test over a dump whose
+  records share a second.
+- The window is **pinned**: `until` is fixed on the first page and carried in the
+  token, so a re-ingest mid-harvest cannot move a record across a page boundary.
+  A record edited during a harvest is missed by *that* harvest and picked up by
+  the next — delayed, never silently skipped.
+- The token carries a **fingerprint of the mapping**, so a token issued under a
+  different mapping is refused with badResumptionToken rather than quietly
+  returning a wrong slice. It also expires (`protocol.tokenTTL`), which is what
+  replaces server-side eviction.
+- `completeListSize` is the size of the whole pinned result set, not the page.
+
+### Metadata formats
+
+Only `ria` (`kind = "passthrough"`) is configured: the stored payload is served
+verbatim inside `<metadata>`, under Zetcom's namespace.
+
+**There is no `oai_dc` yet, and that is an open decision** — deriving Dublin Core
+needs a field-by-field mapping (title, creator, date, rights …) that has not been
+made. It would be a new `kind` in `oai/config.py`, not a rewrite.
+
+### Scale
+
+Paging orders the whole matching set in BaseX (`order by` in `xq/page.xq.tmpl`)
+and `ListRecords` fetches payloads in the same query, rather than seeking an
+index. Fine for tens of thousands of records; worth an index and a seek before
+this carries a large collection.
+
 ## Mapping notes that cost real round trips
 
 - **A prefix used in a query resolves against the query's prolog**, never
@@ -115,6 +165,9 @@ no omissions. `tests/test_ingest_basex.py` asserts each stored payload
   this build). Client/server 1984, stop port 8081.
 - `uuid` is unreliable in the target MuseumPlus instance, so the integer
   `@id` is the identifier key.
-- No remote is configured. Nothing here is pushed anywhere.
-- Not yet written: `oai/protocol.py` (six verbs, error codes, resumption
-  tokens) and `oai/app.py` (`GET`/`POST /oai`).
+- Remote: **https://github.com/mokko/oai-provider** (public, branch `main`).
+- Tests: `./.venv/bin/python -m pytest tests/ -q` — 69 of them. The integration
+  ones need BaseX running and skip themselves when it is not.
+- Not yet done: the `oai_dc` mapping decision; an index/seek for large
+  collections; and a real deployment story for the two secrets, which are dev
+  placeholders (`OAI_BASEX_PASSWORD`, `OAI_TOKEN_SECRET`).
