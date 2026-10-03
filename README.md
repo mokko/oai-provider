@@ -197,13 +197,22 @@ which the earlier Perl provider's in-memory chunk cache could not survive.
 
 ### Metadata formats
 
-Two are configured:
+Three are configured:
 
 - **`ria`** (`kind = "passthrough"`) — the stored payload, verbatim, inside
   `<metadata>`, under Zetcom's namespace.
 - **`oai_dc`** (`kind = "derived"`) — Dublin Core, **assembled at serve time**
   from the same stored payload. The payload is stored once and viewed twice;
   nothing is duplicated on disk.
+- **`lido`** (`kind = "xslt"`) — **LIDO**, produced by the existing
+  `mokko/zml2lido` stylesheet (XSLT 3.0, vendored under `data/lido/`) running
+  **inside BaseX** via `xslt:transform`. That stylesheet is not a per-record
+  mapping: it reads a whole `application/modules` tree and reaches across
+  modules — a person is a forward lookup from `ObjPerAssociationRef`, an asset
+  is a *reverse* one (it points back at the object it documents), and related
+  works point at other objects. So each record's world is reassembled from the
+  module databases, the RIA namespace the ingest stripped is restored, and the
+  whole thing is handed to the transform. The record never leaves the store.
 
 A derived format is declared with the element to build and the prefixes its
 wrapper and terms use, and its terms are **per module**, because the three
@@ -229,8 +238,30 @@ xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
   is deliberately no `dc:title` for objects.
 - Fields were chosen by **coverage counted over the real data**, not by name —
   the notes in `oai.toml` carry the counts beside each choice.
-- Adding a format of this kind is config plus terms; a format that needs a
-  different *mechanism* (LIDO, METS) would be a new `kind`.
+
+### LIDO, and what it costs
+
+- **Saxon and xmlresolver must be on BaseX's classpath** (`lib/Saxon-HE-12.5.jar`,
+  `lib/xmlresolver-5.2.2.jar`). BaseX's built-in `xslt:transform` is XSLT 1.0 and
+  rejects the stylesheet; with Saxon it runs 3.0. The app **probes for this at
+  startup** and refuses to start if it is missing, rather than advertising a
+  format it cannot produce.
+- **BaseX must run with a working directory containing `vocmap.xml` and
+  `europeanaFashion17.rdf`.** The stylesheet calls `document('file:vocmap.xml')`,
+  and a relative `file:` URI resolves against the **process cwd**, not the
+  stylesheet's — which is why zml2lido's own tool does `os.chdir()`. Without it
+  the first ISIL lookup dies with `FODC0002`.
+- **LIDO changes the record model.** It is object-centric: one `lido` per object
+  with persons and assets inlined, so a `lido` harvest is ~1000 records where the
+  raw store has 5,884. `modules = ["Object"]` on the format makes that explicit,
+  and the page, the count and the cursor all work off that subset.
+- **A transform per record costs roughly 0.5s**, so a page of 100 is noticeably
+  slower than the other formats. `ria` and `oai_dc` are unaffected.
+- **The stylesheet decides what is publishable**: it drops objects without
+  `ObjOwnerRef` and only emits `objectPublishedID` for records published at
+  SMB-digital. Those are publishing decisions rather than structure and could be
+  lifted into config; the option is noted in `oai.toml`, not taken.
+
 
 ### Scale
 

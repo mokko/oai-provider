@@ -69,6 +69,34 @@ def q(name: str) -> str:
     return f"{{{OAI_NS}}}{name}"
 
 
+# A stylesheet that is deliberately XSLT **2.0** (string-join does not exist in
+# 1.0). BaseX's built-in processor is 1.0 and refuses it; Saxon on the classpath
+# accepts it. So this one query answers "can this server serve a stylesheet
+# format at all", without guessing at a jar name or a version.
+XSLT_PROBE = (
+    'xslt:transform(<probe/>,'
+    '<xsl:stylesheet version="2.0"'
+    ' xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
+    '<xsl:template match="/"><ok/></xsl:template></xsl:stylesheet>)'
+)
+
+
+async def xslt_problem(client: BaseXClient) -> str:
+    """Why an `xslt` format cannot be served here, or "" if it can.
+
+    Checked once at startup rather than on the first request that asks for
+    LIDO: a repository that advertises a format it cannot produce is worse than
+    one that refuses to start.
+    """
+    try:
+        out = await client.query(XSLT_PROBE)
+    except Exception as exc:  # noqa: BLE001 - any failure is the same answer
+        return str(exc).strip()[:300]
+    if "ok" not in out:
+        return f"xslt:transform returned {out.strip()[:120]!r}"
+    return ""
+
+
 class ProtocolError(Exception):
     """An OAI error, to be rendered as <error code="...">."""
 
@@ -461,9 +489,11 @@ class Provider:
             last_identifier=rows[-1].get("identifier", "") if rows else after_id,
         )
 
-    async def count_matching(self, *, set_spec: str, from_: str, until: str) -> int:
+    async def count_matching(
+        self, *, set_spec: str, from_: str, until: str, fmt=None
+    ) -> int:
         text = await self.client.query(
-            self.builder.count_query(),
+            self.builder.count_query(fmt),
             **self.source_vars,
             set=set_spec,
             **{"from": from_},
@@ -592,7 +622,7 @@ class Provider:
             after_ds = after_id = ""
             delivered = 0
             total = await self.count_matching(
-                set_spec=set_spec, from_=from_, until=pinned
+                set_spec=set_spec, from_=from_, until=pinned, fmt=fmt
             )
 
         page = await self.fetch_page(

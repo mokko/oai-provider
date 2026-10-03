@@ -17,7 +17,7 @@ from starlette.routing import Route
 
 from .basex import BaseXClient
 from .config import Config
-from .protocol import Provider, serialise
+from .protocol import Provider, serialise, xslt_problem
 
 
 def create_app(config: Config, client: BaseXClient | None = None) -> Starlette:
@@ -35,6 +35,19 @@ def create_app(config: Config, client: BaseXClient | None = None) -> Starlette:
         await bx.__aenter__()
         state["client"] = bx
         try:
+            # Fail early, not on the first request that asks for it: a format
+            # that needs Saxon must not be advertised by a server that cannot
+            # produce it.
+            stylesheet_formats = [f for f in config.formats if f.kind == "xslt"]
+            if stylesheet_formats:
+                problem = await xslt_problem(bx)
+                if problem:
+                    raise RuntimeError(
+                        "config advertises "
+                        + ", ".join(f.prefix for f in stylesheet_formats)
+                        + ' (kind "xslt") but BaseX cannot run XSLT 2.0+: '
+                        + problem
+                    )
             yield
         finally:
             if own:

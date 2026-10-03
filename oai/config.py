@@ -7,6 +7,7 @@ different oai.toml.
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 import tomllib
@@ -228,13 +229,40 @@ class MetadataFormat:
     wrapper: str = ""
     namespaces: dict[str, str] = field(default_factory=dict)
     terms: tuple[TermRule, ...] = ()
+    # kind="xslt": an XSLT stylesheet that turns a record into metadata. The
+    # transform runs **inside BaseX** (xslt:transform), so the payload never
+    # leaves the store; it needs Saxon on BaseX's classpath, which the app
+    # probes for at startup rather than discovering on a request.
+    #
+    # `record` is the element to lift out of the transform's output - the
+    # stylesheet emits a wrapper (lidoWrap) and one <metadata> holds one
+    # record (lido) - and its prefix must appear in `namespaces`.
+    #
+    # `modules` restricts which modules serve this format: LIDO is
+    # object-centric, so persons and assets are not LIDO records.
+    stylesheet: str = ""
+    record: str = ""
+    modules: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        if self.kind not in {"passthrough", "derived"}:
+        if self.kind not in {"passthrough", "derived", "xslt"}:
             raise ConfigError(
                 f"metadata format {self.prefix!r}: kind {self.kind!r} is not "
-                "implemented (only 'passthrough' and 'derived')"
+                "implemented (only 'passthrough', 'derived' and 'xslt')"
             )
+        if self.kind == "xslt":
+            if not self.stylesheet:
+                raise ConfigError(
+                    f"metadata format {self.prefix!r}: kind \"xslt\" needs "
+                    "a stylesheet path"
+                )
+            if self.record:
+                prefix = self.record.split(":", 1)[0]
+                if prefix not in self.namespaces:
+                    raise ConfigError(
+                        f"metadata format {self.prefix!r}: record {self.record!r} "
+                        f"uses undeclared prefix {prefix!r}"
+                    )
         if self.kind == "derived":
             if not self.wrapper:
                 raise ConfigError(
@@ -482,6 +510,9 @@ class Config:
                 kind=f.get("kind", "passthrough"),
                 wrapper=f.get("wrapper", ""),
                 namespaces=dict(f.get("namespaces", {})),
+                stylesheet=f.get("stylesheet", ""),
+                record=f.get("record", ""),
+                modules=tuple(f.get("modules", ())),
                 terms=tuple(
                     TermRule(
                         term=t["term"],
@@ -496,6 +527,39 @@ class Config:
         format_prefixes = [f.prefix for f in formats]
         if len(format_prefixes) != len(set(format_prefixes)):
             raise ConfigError("duplicate metadataPrefix in [[metadata.formats]]")
+        # A stylesheet-backed format: resolve the path against the config file
+        # so a deployment can be run from anywhere, and **fail at load time**
+        # if it is missing - a format that cannot possibly work should stop the
+        # server starting, not error once a harvester asks for it.
+        module_names_all = {m.name for m in modules}
+        resolved_formats = []
+        for fmt in formats:
+            if fmt.kind != "xslt":
+                resolved_formats.append(fmt)
+                continue
+            sheet = Path(fmt.stylesheet)
+            if not sheet.is_absolute():
+                sheet = (path.parent / sheet).resolve()
+            if not sheet.is_file():
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r}: stylesheet not found: {sheet}"
+                )
+            if not modules:
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r} is kind \"xslt\" but there "
+                    "are no [[modules]]: the stylesheet reads a whole "
+                    "application/modules tree, which only module mode provides"
+                )
+            unknown = [m for m in fmt.modules if m not in module_names_all]
+            if unknown:
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r}: modules "
+                    f"{', '.join(unknown)} are not in [[modules]]"
+                )
+            resolved_formats.append(
+                dataclasses.replace(fmt, stylesheet=str(sheet))
+            )
+        formats = tuple(resolved_formats)
         # A derived format needs somewhere to get its terms. Either it carries
         # its own (which every source then shares), or every module brings its
         # own - and a module that has none would silently disseminate an empty

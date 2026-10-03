@@ -19,6 +19,28 @@ from .config import ENVELOPE_PREFIX, Mapping
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "xq"
 
+# The MuseumPlus/RIA namespace. Module mode stores records WITHOUT namespaces,
+# but an XSLT written for RIA matches namespace-qualified names
+# (`z:module[@name='Object']`), so the input handed to a transform is rebuilt
+# with this namespace - the reverse of the ingest's local:strip().
+ZETCOM_NS = "http://www.zetcom.com/ria/ws/module"
+
+# Re-namespace a stored record for an XSLT that expects RIA. Attribute names are
+# kept as they are: module ingest only ever dropped ELEMENT namespaces in
+# practice, and an unprefixed attribute belongs to no namespace either way.
+ZETCOM_FUNCTION = (
+    "declare function local:zetcom($n as node()?) as node()? {\n"
+    "  typeswitch ($n)\n"
+    "    case element() return\n"
+    "      element { QName('" + ZETCOM_NS + "', local-name($n)) } {\n"
+    "        $n/@*,\n"
+    "        ($n/node() ! local:zetcom(.))\n"
+    "      }\n"
+    "    case document-node() return document { $n/node() ! local:zetcom(.) }\n"
+    "    default return $n\n"
+    "};"
+)
+
 # MPX/XQuery date normalisation: source timestamps are local wall clock with
 # a space separator and no zone ("2021-09-07 10:56:34.615"). OAI requires a
 # canonical UTC "YYYY-MM-DDThh:mm:ssZ". Appending Z to a local time is wrong
@@ -86,7 +108,23 @@ class QueryBuilder:
         """
         return bool(self.modules)
 
-    def source_expr(self) -> str:
+    def modules_for(self, fmt=None) -> tuple:
+        """The modules a request actually spans.
+
+        A format may serve a subset - LIDO is object-centric, so persons and
+        assets are not LIDO records and must not appear in its result set. That
+        subset IS the result set: paging, the cursor and completeListSize all
+        work off these, so a `ListRecords&metadataPrefix=lido` pages objects
+        only.
+        """
+        if not self.modules:
+            return ()
+        if fmt is not None and fmt.modules:
+            allowed = set(fmt.modules)
+            return tuple(m for m in self.modules if m.name in allowed)
+        return self.modules
+
+    def source_expr(self, fmt=None) -> str:
         """Header rows: datestamp, identifier, status, sets - and **never a
         payload**.
 
@@ -100,8 +138,12 @@ class QueryBuilder:
         Rows live in NO namespace, which is what lets the page, count and
         record templates be identical for both storage modes.
         """
+        modules = self.modules_for(fmt)
+        if modules:
+            return self._module_source(modules)
         if self.modules:
-            return self._module_source()
+            # the format restricts to a module set that produces nothing
+            return "()"
         return self._envelope_source()
 
     # -- the payload, fetched for the page and nothing else ---------------
@@ -136,6 +178,8 @@ class QueryBuilder:
         )
 
     def _module_payload(self, module, fmt=None) -> str:
+        if fmt is not None and fmt.kind == "xslt":
+            return self._xslt_payload(module, fmt)
         terms = module.terms or (fmt.terms if fmt else ())
         body = self._metadata_branch(fmt, terms, "$src", "$src")
         prefix = _xq_string(module.identifier_prefix)
@@ -145,6 +189,107 @@ class QueryBuilder:
             f"let $id := concat({prefix}, string($src/{module.identifier}))\n"
             f"where $id = $wanted/@identifier\n"
             f'return <p id="{{$id}}">{{ {body} }}</p>'
+        )
+
+    # -- kind="xslt": rebuild the record's world, then transform ----------
+
+    def _module_by_name(self, name: str):
+        for module in self.modules:
+            if module.name == name:
+                return module
+        return None
+
+    def _related_forward(self, other, ref_name: str, id_var: str = "$objId") -> str:
+        """Records of `other` that THIS record points at.
+
+        `ObjPerAssociationRef` on an object names person ids; the stylesheet
+        resolves them as `module[@name='Person']/moduleItem[@id = $kueId]`, so
+        the people it needs must be present in the input document.
+        """
+        return (
+            f"for $oth in collection({_xq_string(other.database)})"
+            f"{other.records_xpath()}\n"
+            f"  where string($oth/{other.identifier}) = "
+            f"$src//moduleReference[@name='{ref_name}']"
+            "//moduleReferenceItem/@moduleItemId\n"
+            f"  return local:zetcom($oth)"
+        )
+
+    def _related_reverse(self, other, ref_name: str) -> str:
+        """Records of `other` that point BACK at this record.
+
+        An asset carries `MulObjectRef` naming the object it documents, and
+        resourceWrap selects the assets that way - a reverse lookup, which is
+        why the input has to be assembled from the other database rather than
+        read off the record.
+        """
+        return (
+            f"for $oth in collection({_xq_string(other.database)})"
+            f"{other.records_xpath()}\n"
+            f"  where some $r in $oth"
+            f"//moduleReference[@name='{ref_name}']"
+            "/moduleReferenceItem/@moduleItemId satisfies string($r) = $objId\n"
+            f"  return local:zetcom($oth)"
+        )
+
+    def _xslt_payload(self, module, fmt) -> str:
+        """Assemble one record's input document and transform it.
+
+        The stylesheet is not a per-record mapping: it reads the whole
+        `application/modules` tree. So the record's world is rebuilt here -
+        itself, the persons it names, the assets that name it, and the objects
+        it relates to - and handed to `xslt:transform` whole. The transform runs
+        inside BaseX, so none of this leaves the store.
+        """
+        prefix = _xq_string(module.identifier_prefix)
+        related: list[str] = []
+        people = self._module_by_name("Person")
+        if people is not None:
+            related.append(
+                '<module name="Person">{ '
+                + self._related_forward(people, "ObjPerAssociationRef")
+                + " }</module>"
+            )
+        media = self._module_by_name("Multimedia")
+        if media is not None:
+            related.append(
+                '<module name="Multimedia">{ '
+                + self._related_reverse(media, "MulObjectRef")
+                + " }</module>"
+            )
+        # related works point at other objects of the SAME module
+        same = module.identifier
+        related.append(
+            f'<module name="{module.name}">{{\n'
+            f"    for $oth in collection({_xq_string(module.database)})"
+            f"{module.records_xpath()}\n"
+            f"      where string($oth/{same}) = $src//composite[@name='ObjObjectCre']"
+            "//moduleReferenceItem/@moduleItemId\n"
+            f"         or string($oth/{same}) = $src//moduleReference"
+            "[@name='ObjLiteratureRef']//moduleReferenceItem/@moduleItemId\n"
+            "      return local:zetcom($oth)\n"
+            "  }</module>"
+        )
+        # **`xslt:transform` returns a DOCUMENT node**, not the root element, so
+        # the record sits below it ($out/lidoWrap/lido). Descending from the
+        # result is what makes this independent of whether a given BaseX/Saxon
+        # pair hands back a document or an element.
+        record_select = f"$out//{fmt.record}" if fmt.record else "$out"
+        return (
+            f"for $src in collection({_xq_string(module.database)})"
+            f"{module.records_xpath()}\n"
+            f"let $id := concat({prefix}, string($src/{module.identifier}))\n"
+            "where $id = $wanted/@identifier\n"
+            f"let $objId := string($src/{module.identifier})\n"
+            "let $input :=\n"
+            '  <application xmlns="' + ZETCOM_NS + '">\n'
+            "    <modules>{\n"
+            f'      <module name="{module.name}">{{ local:zetcom($src) }}</module>,\n'
+            + ",\n".join("      " + r for r in related)
+            + "\n    }</modules>\n"
+            "  </application>\n"
+            f"let $out := xslt:transform($input, {_xq_string(fmt.stylesheet)})\n"
+            f'return <p id="{{$id}}">{{ {record_select} }}</p>'
         )
 
     # -- what goes inside <metadata> -------------------------------------
@@ -215,8 +360,8 @@ class QueryBuilder:
             f'       sets="{{string-join($r/{env}:set, \' \')}}"/>'
         )
 
-    def _module_source(self) -> str:
-        blocks = ",\n".join(self._module_block(m) for m in self.modules)
+    def _module_source(self, modules) -> str:
+        blocks = ",\n".join(self._module_block(m) for m in modules)
         return f"(\n{blocks}\n)"
 
     def _module_block(self, module) -> str:
@@ -287,8 +432,9 @@ class QueryBuilder:
             "IDENTIFIER_EXPR": self.identifier_expr(),
             "DATESTAMP_EXPR": self.datestamp_expr(),
             "SET_EXPRESSIONS": self.set_expressions(),
-            "SOURCE": self.source_expr(),
+            "SOURCE": self.source_expr(fmt),
             "PAYLOADS": self.payload_expr(fmt),
+            "ZETCOM_FUNCTION": ZETCOM_FUNCTION,
             "TZOFFSET": self.mapping.timezone_offset,
             **extra,
         }

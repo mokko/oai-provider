@@ -138,8 +138,9 @@ def test_identify(cfg: Config) -> None:
 def test_list_metadata_formats(cfg: Config) -> None:
     root = call(cfg, ("verb", "ListMetadataFormats"))
     prefixes = [e.text for e in root.iter(q("metadataPrefix"))]
-    # the stored payload, and the Dublin Core view derived from it
-    assert prefixes == ["ria", "oai_dc"]
+    # the stored payload, the Dublin Core view derived from it, and LIDO from
+    # the stylesheet
+    assert prefixes == ["ria", "oai_dc", "lido"]
 
 
 def test_list_metadata_formats_unknown_identifier(cfg: Config) -> None:

@@ -120,6 +120,46 @@ wrapper = "oai_dc:dc"
 namespaces = { oai_dc = "http://www.openarchives.org/OAI/2.0/oai_dc/", dc = "http://purl.org/dc/elements/1.1/" }
 
 # ---------------------------------------------------------------------------
+# LIDO, from the XSLT that already exists (mokko/zml2lido, vendored under
+# data/lido/). That stylesheet is **not a per-record mapping**: it reads a whole
+# application/modules tree and reaches across modules - a person is a forward
+# lookup from ObjPerAssociationRef, an asset is a *reverse* one (it points back
+# at the object it documents), and related works point at other objects. So the
+# provider rebuilds each record's world from the module databases, re-adds the
+# RIA namespace the ingest stripped, and hands the whole thing to the transform.
+#
+# kind = "xslt" runs it inside BaseX (xslt:transform), so the record never
+# leaves the store. It needs **Saxon on BaseX's classpath**; the app probes for
+# that at startup and refuses to start without it, rather than failing on the
+# first request that asks for LIDO.
+#
+# Two things this format cannot arrange for itself:
+#   * `modules = ["Object"]` - LIDO is object-centric: one lido per object, with
+#     persons and assets inlined. They are therefore not LIDO records, and
+#     `ListRecords&metadataPrefix=lido` pages objects only.
+#   * the stylesheet calls `document('file:vocmap.xml')` (and the fashion RDF).
+#     A relative `file:` URI is scheme-absolute to the resolver, so it resolves
+#     against **BaseX's working directory**, not the stylesheet's - which is why
+#     zml2lido's own lidoTool.py does os.chdir(). BaseX must run with a cwd
+#     containing vocmap.xml and europeanaFashion17.rdf or the first ISIL lookup
+#     dies with FODC0002.
+#
+# NOTE - a policy deliberately left in the stylesheet for now: it drops objects
+# without `ObjOwnerRef` and only emits `objectPublishedID` for records published
+# at SMB-digital. Those are publishing decisions rather than structure, and
+# could be lifted into config (a requires-xpath per format, or a set rule) so
+# the provider decides what is publishable. Not done; this is the option.
+[[metadata.formats]]
+prefix = "lido"
+namespace = "http://www.lido-schema.org"
+schema = "http://www.lido-schema.org/schema/v1.0/lido-v1.0.xsd"
+kind = "xslt"
+stylesheet = "data/lido/zml2lido.xsl"
+record = "lido:lido"
+modules = ["Object"]
+namespaces = { lido = "http://www.lido-schema.org" }
+
+# ---------------------------------------------------------------------------
 # One MuseumPlus module, one database - the colleague's `sync_<Type>` layout.
 #
 # This is what the ingest writes in module mode (`[[modules]]` present): the
