@@ -153,13 +153,22 @@ no omissions. `tests/test_ingest_basex.py` asserts each stored payload
 ## Serving
 
 ```bash
-OAI_BASEX_PASSWORD=... .venv/bin/python -m uvicorn oai.app:app --factory --port 8000
+cp .env.example .env     # then set OAI_BASE_URL for where this runs
+.venv/bin/python -m uvicorn oai.app:app --factory --host 0.0.0.0 --port 8000
 curl 'http://localhost:8000/oai?verb=Identify'
 ```
 
 `GET /oai` and `POST /oai` reach the same handler, as the spec requires, and a
 test asserts the two produce the same body. `GET /healthz` reports whether BaseX
 answers.
+
+**Deployment values come from the environment, not the tracked file.** `baseURL`
+is read from `OAI_BASE_URL` (a real variable, or a `.env` beside the config —
+`OAI_ENV_FILE` points elsewhere). It must be the address a harvester can call
+back: `Identify` echoes it and harvesters then dial it, so `localhost` is only
+right when the harvester runs on the same machine. `.env` is gitignored;
+`.env.example` is the template. A real environment variable always wins, so a
+service manager's `EnvironmentFile` behaves identically.
 
 All six verbs are implemented (Identify, ListMetadataFormats, ListSets,
 GetRecord, ListIdentifiers, ListRecords) with the error codes customarily
@@ -188,12 +197,40 @@ which the earlier Perl provider's in-memory chunk cache could not survive.
 
 ### Metadata formats
 
-Only `ria` (`kind = "passthrough"`) is configured: the stored payload is served
-verbatim inside `<metadata>`, under Zetcom's namespace.
+Two are configured:
 
-**There is no `oai_dc` yet, and that is an open decision** — deriving Dublin Core
-needs a field-by-field mapping (title, creator, date, rights …) that has not been
-made. It would be a new `kind` in `oai/config.py`, not a rewrite.
+- **`ria`** (`kind = "passthrough"`) — the stored payload, verbatim, inside
+  `<metadata>`, under Zetcom's namespace.
+- **`oai_dc`** (`kind = "derived"`) — Dublin Core, **assembled at serve time**
+  from the same stored payload. The payload is stored once and viewed twice;
+  nothing is duplicated on disk.
+
+A derived format is declared with the element to build and the prefixes its
+wrapper and terms use, and its terms are **per module**, because the three
+modules are three different record shapes:
+
+```toml
+[[metadata.formats]]
+prefix = "oai_dc"
+kind = "derived"
+wrapper = "oai_dc:dc"
+namespaces = { oai_dc = "...", dc = "..." }
+
+[[modules.terms]]         # attached to the last [[modules]] entry
+term = "dc:type"
+xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
+```
+
+- **A term with no value is omitted, never emitted empty.** That is the whole
+  of "correct Dublin Core" here — no blank `dc:date`.
+- **The mapping is authored, not inferred.** Each term is a field the record
+  really has, or a literal declared as one (`dc:language = "de"`). Nothing is
+  invented: the Object module has no title field in the real export, so there
+  is deliberately no `dc:title` for objects.
+- Fields were chosen by **coverage counted over the real data**, not by name —
+  the notes in `oai.toml` carry the counts beside each choice.
+- Adding a format of this kind is config plus terms; a format that needs a
+  different *mechanism* (LIDO, METS) would be a new `kind`.
 
 ### Scale
 

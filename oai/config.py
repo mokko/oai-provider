@@ -20,6 +20,46 @@ ENVELOPE_NS = "urn:oai:envelope"
 ENVELOPE_PREFIX = "env"
 
 
+def load_dotenv(path: Path) -> None:
+    """Populate os.environ from a KEY=VALUE file, without overwriting anything
+    already set.
+
+    stdlib on purpose: python-dotenv is a dependency this project does not need
+    for four lines of parsing. A real environment variable always wins, so a
+    process manager's EnvironmentFile behaves the same as this file.
+    """
+    if not path.is_file():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def dotenv_path(config_path: Path | None = None) -> Path:
+    """Where the deployment's secrets and address live.
+
+    OAI_ENV_FILE wins; otherwise `.env` beside the config file, so a checkout
+    carries its own settings and one file can be swapped per deployment.
+    """
+    override = os.environ.get("OAI_ENV_FILE")
+    if override:
+        return Path(override)
+    base = config_path.parent if config_path else Path(".")
+    return base / ".env"
+
+
 class ConfigError(Exception):
     """Bad or missing configuration."""
 
@@ -139,18 +179,87 @@ class ProtocolSettings:
 
 
 @dataclass(frozen=True)
+class TermRule:
+    """One Dublin Core element and where its value comes from.
+
+    `term` is a **prefixed** name that the format declares ("dc:type"). Exactly
+    one of `xpath` / `literal` is set: an XPath relative to the record, or a
+    constant written here (dc:language "de").
+
+    **An empty value is never emitted** - the element is left out instead. That
+    is what "correct Dublin Core" means here: a term with no source is absent,
+    not present and blank.
+    """
+
+    term: str
+    xpath: str = ""
+    literal: str = ""
+
+    def __post_init__(self) -> None:
+        if not TERM_RE.fullmatch(self.term):
+            raise ConfigError(
+                f"term {self.term!r} must be a prefixed name like 'dc:title'"
+            )
+        if bool(self.xpath) == bool(self.literal):
+            raise ConfigError(
+                f"term {self.term!r} needs exactly one of xpath / literal"
+            )
+
+
+TERM_RE = re.compile(r"^[A-Za-z_][\w.\-]*:[A-Za-z_][\w.\-]*$")
+
+
+@dataclass(frozen=True)
 class MetadataFormat:
     """A format we can disseminate.
 
     kind="passthrough" serves the stored payload verbatim inside <metadata>.
-    A derived format (oai_dc assembled from XPaths) is not implemented - that
-    is still an open decision.
+    kind="derived" builds `wrapper` from the term rules (oai_dc), so the
+    payload is stored once and any number of views are assembled from it.
     """
 
     prefix: str
     namespace: str
     schema: str = ""
     kind: str = "passthrough"
+    # kind="derived": the element to build ("oai_dc:dc") and the prefixes its
+    # wrapper and terms use. Every prefix a term names must be declared here,
+    # because a query's prefixes resolve against its own prolog.
+    wrapper: str = ""
+    namespaces: dict[str, str] = field(default_factory=dict)
+    terms: tuple[TermRule, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"passthrough", "derived"}:
+            raise ConfigError(
+                f"metadata format {self.prefix!r}: kind {self.kind!r} is not "
+                "implemented (only 'passthrough' and 'derived')"
+            )
+        if self.kind == "derived":
+            if not self.wrapper:
+                raise ConfigError(
+                    f"metadata format {self.prefix!r}: a derived format needs "
+                    "a wrapper element (e.g. wrapper = \"oai_dc:dc\")"
+                )
+            if not self.terms and not self.namespaces:
+                raise ConfigError(
+                    f"metadata format {self.prefix!r}: a derived format needs a "
+                    "namespaces table for its wrapper and terms"
+                )
+            wrapper_prefix = self.wrapper.split(":", 1)[0]
+            declared = set(self.namespaces)
+            if wrapper_prefix not in declared:
+                raise ConfigError(
+                    f"metadata format {self.prefix!r}: wrapper prefix "
+                    f"{wrapper_prefix!r} is not in its namespaces table"
+                )
+            for rule in self.terms:
+                prefix = rule.term.split(":", 1)[0]
+                if prefix not in declared:
+                    raise ConfigError(
+                        f"metadata format {self.prefix!r}: term {rule.term!r} "
+                        f"uses undeclared prefix {prefix!r}"
+                    )
 
 
 @dataclass(frozen=True)
@@ -179,6 +288,11 @@ class ModuleConfig:
     identifier: str = "@id"
     datestamp: str = "systemField[@name='__lastModified']/value"
     sets: tuple[SetRule, ...] = ()
+    # A derived metadata format's terms are the shape of one *kind of record*,
+    # and the modules are different record shapes, so a module may override
+    # them. Falling back to the format's own terms keeps one shared mapping for
+    # the common case.
+    terms: tuple[TermRule, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -219,6 +333,9 @@ class Config:
         path = Path(path)
         if not path.exists():
             raise ConfigError(f"config not found: {path}")
+        # Deployment-specific values come from the environment (a real variable
+        # or a .env beside the config), so the tracked file stays neutral.
+        load_dotenv(dotenv_path(path))
         with open(path, "rb") as fh:
             raw = tomllib.load(fh)
 
@@ -235,7 +352,10 @@ class Config:
 
         identity = Identity(
             repository_name=ident_raw["repositoryName"],
-            base_url=ident_raw["baseURL"],
+            # OAI_BASE_URL wins: the address a harvester must call back is a
+            # property of where this is deployed, not of the code, and it must
+            # be right - Identify echoes it and harvesters then call it.
+            base_url=os.environ.get("OAI_BASE_URL") or ident_raw["baseURL"],
             admin_email=ident_raw["adminEmail"],
             earliest_datestamp=ident_raw.get(
                 "earliestDatestamp", "1970-01-01T00:00:00Z"
@@ -303,6 +423,14 @@ class Config:
                     )
                     for s in m.get("sets", [])
                 ),
+                terms=tuple(
+                    TermRule(
+                        term=t["term"],
+                        xpath=t.get("xpath", ""),
+                        literal=t.get("literal", ""),
+                    )
+                    for t in m.get("terms", [])
+                ),
             )
             for m in raw.get("modules", [])
         )
@@ -352,14 +480,40 @@ class Config:
                 namespace=f["namespace"],
                 schema=f.get("schema", ""),
                 kind=f.get("kind", "passthrough"),
+                wrapper=f.get("wrapper", ""),
+                namespaces=dict(f.get("namespaces", {})),
+                terms=tuple(
+                    TermRule(
+                        term=t["term"],
+                        xpath=t.get("xpath", ""),
+                        literal=t.get("literal", ""),
+                    )
+                    for t in f.get("terms", [])
+                ),
             )
             for f in raw.get("metadata", {}).get("formats", [])
         )
+        format_prefixes = [f.prefix for f in formats]
+        if len(format_prefixes) != len(set(format_prefixes)):
+            raise ConfigError("duplicate metadataPrefix in [[metadata.formats]]")
+        # A derived format needs somewhere to get its terms. Either it carries
+        # its own (which every source then shares), or every module brings its
+        # own - and a module that has none would silently disseminate an empty
+        # oai_dc, so that is an error rather than an omission.
         for fmt in formats:
-            if fmt.kind != "passthrough":
+            if fmt.kind != "derived" or fmt.terms:
+                continue
+            if not modules:
                 raise ConfigError(
-                    f"metadata format {fmt.prefix!r}: kind {fmt.kind!r} is not "
-                    "implemented yet (only 'passthrough')"
+                    f"metadata format {fmt.prefix!r} is derived but has no "
+                    "[[metadata.formats.terms]]"
+                )
+            missing = [m.name for m in modules if not m.terms]
+            if missing:
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r} has no terms of its own, "
+                    "so every module must define them; missing for: "
+                    + ", ".join(missing)
                 )
         if not formats:
             raise ConfigError(

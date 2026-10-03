@@ -221,8 +221,15 @@ def test_fingerprint_changes_when_the_mapping_changes(config: Config) -> None:
 def test_unknown_prefix_is_cannot_disseminate_format(config: Config) -> None:
     provider = Provider(config, client=None)  # type: ignore[arg-type]
     with pytest.raises(ProtocolError) as err:
-        provider.format_for("oai_dc")
+        provider.format_for("mods")
     assert err.value.code == "cannotDisseminateFormat"
+
+
+def test_the_derived_format_is_a_format_too(config: Config) -> None:
+    provider = Provider(config, client=None)  # type: ignore[arg-type]
+    fmt = provider.format_for("oai_dc")
+    assert fmt.kind == "derived"
+    assert fmt.wrapper == "oai_dc:dc"
 
 
 def test_configured_prefix_resolves(config: Config) -> None:

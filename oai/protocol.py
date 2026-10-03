@@ -430,10 +430,11 @@ class Provider:
         after_ds: str,
         after_id: str,
         with_payload: bool,
+        fmt=None,
     ) -> Page:
         limit = self.config.protocol.page_size
         nodes = await self.client.query_nodes(
-            self.builder.page_query(),
+            self.builder.page_query(fmt),
             **self.source_vars,
             set=set_spec,
             **{"from": from_},
@@ -522,7 +523,7 @@ class Provider:
         fmt = self.format_for(request.metadata_prefix)
         identifier = request.args["identifier"]
         rows = await self.client.query_nodes(
-            self.builder.record_query(),
+            self.builder.record_query(fmt),
             **self.source_vars,
             identifier=identifier,
             withPayload="true",
@@ -601,6 +602,7 @@ class Provider:
             after_ds=after_ds,
             after_id=after_id,
             with_payload=with_payload,
+            fmt=fmt,
         )
 
         if not page.rows and not request.token:

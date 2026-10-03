@@ -6,6 +6,10 @@
 [identity]
 repositoryName = "Museum collection (OAI provider recreation)"
 baseURL = "http://localhost:8000/oai"
+# ^ the neutral default. The address this is actually deployed behind comes
+# from OAI_BASE_URL - a real environment variable, or `.env` next to this file
+# (see `.env.example`). It must be the address a harvester can call back:
+# Identify echoes it and harvesters then dial it.
 adminEmail = "mauricemengel@gmail.com"
 earliestDatestamp = "1970-01-01T00:00:00Z"
 granularity = "YYYY-MM-DDThh:mm:ssZ"
@@ -91,6 +95,30 @@ namespace = "http://www.zetcom.com/ria/ws/module"
 schema = ""
 kind = "passthrough"
 
+# Dublin Core, assembled at serve time from the stored payload. The payload is
+# still stored and served verbatim for "ria"; this is a second view of it, not
+# a second copy.
+#
+# Every prefix a term names is declared in `namespaces`, because a prefix in a
+# query resolves against the query's own prolog - the stored payload has no
+# namespaces to lend.
+#
+# **A term with no value is omitted, never emitted empty.** That is the whole
+# of "correct Dublin Core" here: if the record has nothing for dc:date, there is
+# no dc:date - rather than a blank one.
+#
+# The terms are per module, because the three modules are three different
+# record shapes (see [[modules.terms]] below). Nothing here is invented: each
+# element is either a field the record really has, or a literal declared as
+# such (dc:language).
+[[metadata.formats]]
+prefix = "oai_dc"
+namespace = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+schema = "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
+kind = "derived"
+wrapper = "oai_dc:dc"
+namespaces = { oai_dc = "http://www.openarchives.org/OAI/2.0/oai_dc/", dc = "http://purl.org/dc/elements/1.1/" }
+
 # ---------------------------------------------------------------------------
 # One MuseumPlus module, one database - the colleague's `sync_<Type>` layout.
 #
@@ -114,13 +142,142 @@ name = "Object"
 database = "sync_Object"
 identifierPrefix = "spk-berlin.de:EM-object-"
 
+# Dublin Core for an Object. Grounded in what the 1000 real objects actually
+# carry (coverage counted, not assumed): object number 1000/1000, main
+# participant 1000/1000, technical term 999/1000, material/technique 998/1000,
+# date virtual field 863/1000.
+#
+# **There is no title field.** The sample fixture's ObjObjectTitleClb occurs
+# zero times in the real export, so dc:title is deliberately absent rather
+# than filled with something that is not a title.
+[[modules.terms]]
+term = "dc:identifier"
+xpath = "//dataField[@name='ObjObjectNumberTxt']/value"
+
+# the main person association, as the museum's own display form ("Opel, Peter")
+[[modules.terms]]
+term = "dc:creator"
+xpath = "//virtualField[@name='ObjPerAssociationMainParticipantNameVrt']/value"
+
+# the object's own term, e.g. "Zeichnung"
+[[modules.terms]]
+term = "dc:type"
+xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
+
+# e.g. "1587" - the museum's formatted date, not a machine date
+[[modules.terms]]
+term = "dc:date"
+xpath = "//virtualField[@name='ObjDateVrt']/value"
+
+# material and technique, e.g. "Feder in Braun, auf ... gezeichnet"
+[[modules.terms]]
+term = "dc:format"
+xpath = "//virtualField[@name='ObjMaterialTechniqueVrt']/value"
+
+# subject keywords, from the classification the museum files the object under
+[[modules.terms]]
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='ObjOrgGroupVoc']//formattedValue"
+
+[[modules.terms]]
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='MaterialVoc']//formattedValue"
+
+[[modules.terms]]
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='ObjCategoryVoc']//formattedValue"
+
+# The collection is German; this is a declared constant, not a field.
+[[modules.terms]]
+term = "dc:language"
+literal = "de"
+
 [[modules]]
 name = "Person"
 database = "sync_Person"
 identifierPrefix = "spk-berlin.de:EM-person-"
 
+# A Person record: the name is what names it, so the name is the title.
+[[modules.terms]]
+term = "dc:title"
+xpath = "//dataField[@name='PerNennformTxt']/value"
+
+[[modules.terms]]
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='PerNationalityVoc']//formattedValue"
+
+[[modules.terms]]
+term = "dc:description"
+xpath = "//dataField[@name='PerNotesClb']/value"
+
+[[modules.terms]]
+term = "dc:source"
+xpath = "//dataField[@name='PerSourceClb']/value"
+
+[[modules.terms]]
+term = "dc:language"
+literal = "de"
+
 [[modules]]
 name = "Multimedia"
 database = "sync_Multimedia"
 identifierPrefix = "spk-berlin.de:EM-asset-"
+
+# A Multimedia record IS an asset, so the fields are the asset's own.
+#
+# Chosen by coverage across the 4232 real assets, not by the field's name:
+# MulOriginalFileTxt 4168/4232, MulSubjectTxt 2186, MulDateTxt 1845,
+# MulReferenceNumberTxt 1120, MulShootingDateDat 884, MulIPTCUrheberTxt 191,
+# MulIPTCObjRefTxt 192, MulIPTCRightsTxt 172, MulTypeTxt 102. The fields that
+# sound right but are nearly empty (MulPhotocreditTxt 33/4232,
+# MulIPTCObjTitleTxt 103) are carried as extras, not as the main source.
+[[modules.terms]]
+term = "dc:title"
+xpath = "//dataField[@name='MulOriginalFileTxt']/value"
+
+[[modules.terms]]
+term = "dc:title"
+xpath = "//dataField[@name='MulIPTCObjTitleTxt']/value"
+
+# the photographer / rights holder of the image
+[[modules.terms]]
+term = "dc:creator"
+xpath = "//dataField[@name='MulIPTCUrheberTxt']/value"
+
+[[modules.terms]]
+term = "dc:identifier"
+xpath = "//dataField[@name='MulReferenceNumberTxt']/value"
+
+[[modules.terms]]
+term = "dc:type"
+xpath = "//dataField[@name='MulTypeTxt']/value"
+
+[[modules.terms]]
+term = "dc:date"
+xpath = "//dataField[@name='MulDateTxt']/value"
+
+[[modules.terms]]
+term = "dc:date"
+xpath = "//dataField[@name='MulShootingDateDat']/value"
+
+[[modules.terms]]
+term = "dc:description"
+xpath = "//dataField[@name='MulSubjectTxt']/value"
+
+[[modules.terms]]
+term = "dc:rights"
+xpath = "//dataField[@name='MulIPTCRightsTxt']/value"
+
+[[modules.terms]]
+term = "dc:source"
+xpath = "//dataField[@name='MulPhotocreditTxt']/value"
+
+# the object this asset documents
+[[modules.terms]]
+term = "dc:relation"
+xpath = "//dataField[@name='MulIPTCObjRefTxt']/value"
+
+[[modules.terms]]
+term = "dc:language"
+literal = "de"
 

@@ -138,7 +138,8 @@ def test_identify(cfg: Config) -> None:
 def test_list_metadata_formats(cfg: Config) -> None:
     root = call(cfg, ("verb", "ListMetadataFormats"))
     prefixes = [e.text for e in root.iter(q("metadataPrefix"))]
-    assert prefixes == ["ria"]
+    # the stored payload, and the Dublin Core view derived from it
+    assert prefixes == ["ria", "oai_dc"]
 
 
 def test_list_metadata_formats_unknown_identifier(cfg: Config) -> None:
@@ -196,7 +197,7 @@ def test_get_record_unsupported_format(cfg: Config) -> None:
         cfg,
         ("verb", "GetRecord"),
         ("identifier", "spk-berlin.de:EM-objId-1001"),
-        ("metadataPrefix", "oai_dc"),
+        ("metadataPrefix", "mods"),
     )
     assert errors(root)[0][0] == "cannotDisseminateFormat"
 

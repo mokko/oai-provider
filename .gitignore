@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Deployment settings: the address to be reached at, and credentials.
+# `.env.example` is the tracked template.
+.env
+
 # Museum data samples. Large (a single RIA chunk is ~200 MB unpacked) and not
 # ours to publish, so **nothing in here is ever committed or pushed**. The
 # directory is expected to exist locally and to stay out of git entirely.
