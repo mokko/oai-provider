@@ -43,10 +43,92 @@ declare function local:oaiDate($raw as xs:string?, $offset as xs:string)
 '''.strip()
 
 
+def _xq_string(value: str) -> str:
+    """A single-quoted XQuery string literal.
+
+    XQuery escapes a quote inside a single-quoted literal by doubling it, so
+    this is what keeps a config-authored value from ending the literal early.
+    """
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 class QueryBuilder:
-    def __init__(self, mapping: Mapping, template_dir: Path = TEMPLATE_DIR):
+    def __init__(
+        self,
+        mapping: Mapping,
+        modules: tuple = (),
+        template_dir: Path = TEMPLATE_DIR,
+    ):
         self.mapping = mapping
+        self.modules = tuple(modules)
         self.template_dir = Path(template_dir)
+
+    # -- the source of rows ----------------------------------------------
+
+    def uses_modules(self) -> bool:
+        """Whether this mapping reads the per-module databases.
+
+        With [[modules]] configured the provider serves the module databases
+        (the colleague's `sync_*` layout); without them it serves the single
+        enveloped database. The two are normalized to the same row shape here,
+        so nothing downstream - paging, the cursor, the token - has to know
+        which one it is talking to.
+        """
+        return bool(self.modules)
+
+    def source_expr(self) -> str:
+        """An XQuery expression yielding unfiltered `<row>` elements.
+
+        A row carries `datestamp`, `identifier`, `status` and `sets` as
+        attributes and the payload as its only child (when `$withPayload` is
+        `'true'`). Every row lives in NO namespace, which is what lets the page,
+        count and record templates be identical for both modes.
+        """
+        if self.modules:
+            return self._module_source()
+        return self._envelope_source()
+
+    def _envelope_source(self) -> str:
+        env = ENVELOPE_PREFIX
+        return (
+            f"for $r in collection($db)/{env}:record\n"
+            "return\n"
+            f'  <row datestamp="{{$r/@{env}:datestamp}}"\n'
+            f'       identifier="{{$r/@{env}:identifier}}"\n'
+            f'       status="{{string($r/@{env}:status)}}"\n'
+            f'       sets="{{string-join($r/{env}:set, \' \')}}">{{\n'
+            "    if ($withPayload = 'true'\n"
+            f"        and string($r/@{env}:status) ne 'deleted')\n"
+            f"    then $r/{env}:source/node()\n"
+            "    else ()\n"
+            "  }</row>"
+        )
+
+    def _module_source(self) -> str:
+        blocks = ",\n".join(self._module_block(m) for m in self.modules)
+        return f"(\n{blocks}\n)"
+
+    def _module_block(self, module) -> str:
+        records = module.records_xpath()
+        ident = module.identifier
+        ds = module.datestamp
+        prefix = _xq_string(module.identifier_prefix)
+        sets = self._set_expressions(module.sets)
+        return (
+            f"for $r in collection({_xq_string(module.database)}){records}\n"
+            f"let $raw := string($r/{ident})\n"
+            f"let $ds := local:oaiDate(string($r/{ds}), $tzOffset)\n"
+            f"let $sets := distinct-values(({sets}))\n"
+            "where $raw ne '' and $ds\n"
+            "return\n"
+            '  <row datestamp="{$ds}"\n'
+            f'       identifier="{{concat({prefix}, $raw)}}"\n'
+            '       status=""\n'
+            '       sets="{string-join($sets, \' \')}">{\n'
+            "    if ($withPayload = 'true') then $r else ()\n"
+            "  }</row>"
+        )
+
 
     # -- pieces -----------------------------------------------------------
 
@@ -54,21 +136,25 @@ class QueryBuilder:
     def _spec_literal(spec: str) -> str:
         return "'" + spec.replace("'", "&apos;") + "'"
 
-    def set_expressions(self) -> str:
-        """One allow-list test per declared set.
+    def _set_expressions(self, rules) -> str:
+        """One allow-list test per set rule, against the record `$r`.
 
         The XPath is a membership predicate and its value is ignored: the
-        setSpec is the string we wrote in config, so nothing from the record
+        setSpec is the string written in config, so nothing from the record
         can appear in OAI output.
         """
-        if not self.mapping.sets:
+        if not rules:
             return ""
         parts = [
-            f"if (exists({self.mapping.resolve(rule.xpath)})) "
+            f"if (exists($r/{rule.xpath})) "
             f"then {self._spec_literal(rule.spec)} else ()"
-            for rule in self.mapping.sets
+            for rule in rules
         ]
         return ",\n    ".join(parts)
+
+    def set_expressions(self) -> str:
+        """Set membership for the enveloped mapping (rooted at $r)."""
+        return self._set_expressions(self.mapping.sets)
 
     def identifier_expr(self) -> str:
         return f"string({self.mapping.resolve(self.mapping.identifier)})"
@@ -91,6 +177,8 @@ class QueryBuilder:
             "IDENTIFIER_EXPR": self.identifier_expr(),
             "DATESTAMP_EXPR": self.datestamp_expr(),
             "SET_EXPRESSIONS": self.set_expressions(),
+            "SOURCE": self.source_expr(),
+            "TZOFFSET": self.mapping.timezone_offset,
             **extra,
         }
         for key, value in subs.items():

@@ -165,17 +165,43 @@ class ModuleConfig:
     reads exactly like his own queries. The module name is the one in the
     dump (`module/@name`); it is also what tells two otherwise identical
     records apart, so it is carried in the OAI identifier prefix.
+
+    The XPaths below are **relative to the record** and written for
+    namespace-stripped data, which is what module mode stores. They are the
+    module's own mapping so that a module can differ from its siblings; the
+    defaults are the MuseumPlus shapes.
     """
 
     name: str
     database: str
     identifier_prefix: str = ""
+    records: str = ""
+    identifier: str = "@id"
+    datestamp: str = "systemField[@name='__lastModified']/value"
+    sets: tuple[SetRule, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ConfigError("module.name is required")
         if not self.database.strip():
             raise ConfigError(f"module {self.name!r} has no database")
+        # The database name is interpolated into generated queries (it names a
+        # collection), so it is held to an identifier-shaped charset rather
+        # than trusted raw.
+        if not MODULE_DB_RE.fullmatch(self.database):
+            raise ConfigError(
+                f"module {self.name!r}: database {self.database!r} is not a "
+                "plain name (A-Za-z0-9 _ - . only)"
+            )
+
+    def records_xpath(self) -> str:
+        return self.records or (
+            f"/application/modules/module[@name='{self.name}']/moduleItem"
+        )
+
+
+# A BaseX database name we are willing to write into generated query text.
+MODULE_DB_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*$")
 
 
 @dataclass(frozen=True)
@@ -264,6 +290,19 @@ class Config:
                 name=m.get("name", ""),
                 database=m.get("database", ""),
                 identifier_prefix=m.get("identifierPrefix", ""),
+                records=m.get("records", ""),
+                identifier=m.get("identifier", "@id"),
+                datestamp=m.get(
+                    "datestamp", "systemField[@name='__lastModified']/value"
+                ),
+                sets=tuple(
+                    SetRule(
+                        spec=s["spec"],
+                        label=s.get("label", s["spec"]),
+                        xpath=s["xpath"],
+                    )
+                    for s in m.get("sets", [])
+                ),
             )
             for m in raw.get("modules", [])
         )

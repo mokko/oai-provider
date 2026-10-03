@@ -6,13 +6,15 @@ Unit tests need no BaseX; the integration tests are skipped unless one answers.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 from pathlib import Path
 
 import pytest
 
 from oai.basex import BaseXClient
-from oai.config import Config, ConfigError
+from oai.config import Config, ConfigError, ModuleConfig, SetRule
 from oai.mapping import QueryBuilder
+from oai.protocol import Provider, q
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "samples" / "ria-dump.xml"
@@ -179,3 +181,183 @@ def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> N
     assert count == "3"
     assert uris == ""  # namespaces are gone
     assert value == "EM-1001"
+
+
+# -- the six verbs over the module databases ------------------------------
+
+DB_OBJ = "oai_module_check_obj"
+DB_PER = "oai_module_check_per"
+
+# A two-module dump, namespaced on purpose: the ingest must strip it, and the
+# verbs must read it back. Object carries a group reference so a module set rule
+# has something to match.
+TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
+<application xmlns="http://www.zetcom.com/ria/ws/module">
+  <modules>
+    <module name="Object" totalSize="2">
+      <moduleItem hasAttachments="true" id="1001">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-01-02 10:00:00.0</value>
+        </systemField>
+        <dataField dataType="Varchar" name="ObjObjectNumberTxt">
+          <value>EM-1001</value>
+        </dataField>
+        <moduleReference name="ObjObjectGroupsRef">
+          <moduleReferenceItem moduleItemId="6054"/>
+        </moduleReference>
+      </moduleItem>
+      <moduleItem hasAttachments="false" id="1002">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-02-02 10:00:00.0</value>
+        </systemField>
+        <dataField dataType="Varchar" name="ObjObjectNumberTxt">
+          <value>EM-1002</value>
+        </dataField>
+      </moduleItem>
+    </module>
+    <module name="Person" totalSize="1">
+      <moduleItem hasAttachments="false" id="77">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-03-02 10:00:00.0</value>
+        </systemField>
+        <dataField dataType="Varchar" name="PerNameTxt">
+          <value>Doe, Jane</value>
+        </dataField>
+      </moduleItem>
+    </module>
+  </modules>
+</application>
+"""
+
+
+@pytest.fixture()
+def module_config(live: Config, tmp_path) -> Config:
+    """The live config with the two test modules swapped in for the real ones."""
+    # the same id 1001 exists in both modules, which is exactly the collision
+    # the module tag in the prefix has to resolve
+    mods = (
+        ModuleConfig(
+            name="Object",
+            database=DB_OBJ,
+            identifier_prefix="spk-berlin.de:EM-object-",
+            sets=(
+                SetRule(
+                    spec="mimo",
+                    label="Musikinstrumente",
+                    xpath="moduleReference[@name='ObjObjectGroupsRef']"
+                    "/moduleReferenceItem[@moduleItemId='6054']",
+                ),
+            ),
+        ),
+        ModuleConfig(
+            name="Person",
+            database=DB_PER,
+            identifier_prefix="spk-berlin.de:EM-person-",
+        ),
+    )
+    dump = tmp_path / "two.xml"
+    dump.write_text(TWO_MODULES, encoding="utf-8")
+    config = dataclasses.replace(
+        live,
+        modules=mods,
+        basex=dataclasses.replace(live.basex, database="unused-in-module-mode"),
+    )
+    _seed_modules(config, dump)
+    return config
+
+
+def _seed_modules(config: Config, dump: Path) -> None:
+    builder = QueryBuilder(config.mapping, config.modules)
+
+    async def go(bx: BaseXClient):
+        for module in config.modules:
+            if await bx.database_exists(module.database):
+                await bx.drop_database(module.database)
+            await bx.create_database(module.database)
+            await bx.query(
+                builder.module_ingest_query(),
+                path=str(dump),
+                db=module.database,
+                moduleName=module.name,
+            )
+
+    _run(config, go)
+
+
+def _call(config: Config, *pairs: tuple[str, str]):
+    async def go(bx: BaseXClient):
+        return await Provider(config, bx).handle(list(pairs))
+
+    return _run(config, go)
+
+
+def test_verbs_read_all_three_sources_by_identifier(module_config: Config) -> None:
+    """Identifiers from both modules, and the shared integer id 1001 does not
+    collide because each module carries its own prefix."""
+    root = _call(
+        module_config, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria")
+    )
+    headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
+    ids = {h.find(q("identifier")).text for h in headers}
+    assert ids == {
+        "spk-berlin.de:EM-object-1001",
+        "spk-berlin.de:EM-object-1002",
+        "spk-berlin.de:EM-person-77",
+    }
+
+
+def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
+    module_config: Config,
+) -> None:
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:EM-person-77"),
+        ("metadataPrefix", "ria"),
+    )
+    header = root.find(f"{q('GetRecord')}/{q('header')}")
+    assert header.find(q("identifier")).text == "spk-berlin.de:EM-person-77"
+    # 10:00 local at +02:00 is 08:00Z
+    assert header.find(q("datestamp")).text == "2026-03-02T08:00:00Z"
+    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    item = list(md)[0]
+    assert item.tag == "moduleItem"
+    assert item.find("dataField[@name='PerNameTxt']/value").text == "Doe, Jane"
+
+
+def test_module_set_filters_on_the_envelope_free_rows(module_config: Config) -> None:
+    root = _call(module_config, ("verb", "ListSets"))
+    specs = [
+        s.find(q("setSpec")).text for s in root.findall(f"{q('ListSets')}/{q('set')}")
+    ]
+    assert specs == ["mimo"]
+    # and the filter actually selects: only the object with the group reference
+    root = _call(
+        module_config,
+        ("verb", "ListIdentifiers"),
+        ("metadataPrefix", "ria"),
+        ("set", "mimo"),
+    )
+    headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
+    assert [h.find(q("identifier")).text for h in headers] == [
+        "spk-berlin.de:EM-object-1001"
+    ]
+
+
+def test_unknown_identifier_is_id_does_not_exist(module_config: Config) -> None:
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:EM-person-999"),
+        ("metadataPrefix", "ria"),
+    )
+    err = root.find(q("error"))
+    assert err is not None and err.get("code") == "idDoesNotExist"
+
+
+def test_list_records_carries_the_module_item_as_metadata(module_config: Config) -> None:
+    root = _call(module_config, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
+    mds = root.findall(f"{q('ListRecords')}/{q('metadata')}")
+    assert len(mds) == 3
+    assert all(list(md)[0].tag == "moduleItem" for md in mds)
+

@@ -9,12 +9,20 @@
 
    $until is pinned on the first page and carried in the resumption token, so
    a re-ingest during a harvest cannot move a record across a page boundary.
+
+   The rows come from {{SOURCE}}, which is either the envelope database or the
+   per-module databases. Both yield the same no-namespace <row> shape, so
+   nothing below has to know which storage is behind it.
 :)
 {{NAMESPACES}}
+{{OAI_DATE_FUNCTION}}
 
 declare option output:indent "no";
 
 declare variable $db external;
+(: the configured offset, used when a datestamp is normalized out of a local
+   wall clock (module mode reads the record's own __lastModified). :)
+declare variable $tzOffset external;
 declare variable $set external;
 declare variable $from external;
 declare variable $until external;
@@ -27,17 +35,22 @@ declare variable $afterId external;
 declare variable $limit as xs:integer external;
 declare variable $withPayload external;
 
+let $rows := {{SOURCE}}
+
 let $matching :=
-  for $r in collection($db)/{{ENVELOPE_PREFIX}}:record
-  where ($from = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp ge $from)
-    and ($until = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp le $until)
-    and ($set = '' or $r/{{ENVELOPE_PREFIX}}:set = $set)
+  for $r in $rows
+  where ($from = '' or $r/@datestamp ge $from)
+    and ($until = '' or $r/@datestamp le $until)
+    (: tokenize, not contains: a space-joined attribute tested with contains
+       would match 'art' inside 'earth'. A record with no sets tokenizes to the
+       empty sequence, which never equals a real setSpec. :)
+    and ($set = '' or $set = tokenize(string($r/@sets), '\s+'))
     and ($afterDs = ''
-         or $r/@{{ENVELOPE_PREFIX}}:datestamp gt $afterDs
-         or ($r/@{{ENVELOPE_PREFIX}}:datestamp eq $afterDs
-             and $r/@{{ENVELOPE_PREFIX}}:identifier gt $afterId))
-  order by $r/@{{ENVELOPE_PREFIX}}:datestamp ascending,
-           $r/@{{ENVELOPE_PREFIX}}:identifier ascending
+         or $r/@datestamp gt $afterDs
+         or ($r/@datestamp eq $afterDs
+             and $r/@identifier gt $afterId))
+  order by $r/@datestamp ascending,
+           $r/@identifier ascending
   return $r
 
 (: limit + 1, so the caller can tell whether another page exists without a
@@ -45,14 +58,5 @@ let $matching :=
 return
   <page>{
     for $r in subsequence($matching, 1, $limit + 1)
-    return
-      <row datestamp="{$r/@{{ENVELOPE_PREFIX}}:datestamp}"
-           identifier="{$r/@{{ENVELOPE_PREFIX}}:identifier}"
-           status="{string($r/@{{ENVELOPE_PREFIX}}:status)}"
-           sets="{string-join($r/{{ENVELOPE_PREFIX}}:set, ' ')}">{
-        if ($withPayload = 'true' and
-            string($r/@{{ENVELOPE_PREFIX}}:status) ne 'deleted')
-        then $r/{{ENVELOPE_PREFIX}}:source/node()
-        else ()
-      }</row>
+    return $r
   }</page>

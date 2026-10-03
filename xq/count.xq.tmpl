@@ -1,16 +1,22 @@
 (: completeListSize for the pinned query, ignoring the cursor: the size of
    the whole result set the token belongs to, not of the current page.
+
+   Rows come from {{SOURCE}} - the envelope database or the per-module
+   databases - and both normalize to the same <row> shape.
 :)
 {{NAMESPACES}}
+{{OAI_DATE_FUNCTION}}
 
 declare variable $db external;
+declare variable $tzOffset external;
 declare variable $set external;
 declare variable $from external;
 declare variable $until external;
+declare variable $withPayload external;
 
 count(
-  for $r in collection($db)/{{ENVELOPE_PREFIX}}:record
-  where ($from = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp ge $from)
-    and ($until = '' or $r/@{{ENVELOPE_PREFIX}}:datestamp le $until)
-    and ($set = '' or $r/{{ENVELOPE_PREFIX}}:set = $set)
+  for $r in {{SOURCE}}
+  where ($from = '' or $r/@datestamp ge $from)
+    and ($until = '' or $r/@datestamp le $until)
+    and ($set = '' or $set = tokenize(string($r/@sets), '\s+'))
   return $r)

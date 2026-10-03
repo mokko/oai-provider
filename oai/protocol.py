@@ -375,8 +375,30 @@ class Provider:
     def __init__(self, config: Config, client: BaseXClient) -> None:
         self.config = config
         self.client = client
-        self.builder = QueryBuilder(config.mapping)
+        self.builder = QueryBuilder(config.mapping, config.modules)
         self.granularity = config.identity.granularity
+        # Sets come from the sources that are actually served: the modules'
+        # own allow-lists in module mode, the single enveloped mapping
+        # otherwise. Deduplicated by spec, because the same set can be
+        # declared by more than one module.
+        rules: list = []
+        if config.modules:
+            seen: set[str] = set()
+            for module in config.modules:
+                for rule in module.sets:
+                    if rule.spec not in seen:
+                        seen.add(rule.spec)
+                        rules.append(rule)
+        else:
+            rules = list(config.mapping.sets)
+        self.set_rules = tuple(rules)
+        # Bound into every query that renders a source: the envelope database
+        # (unused in module mode, harmless) and the offset a local wall clock
+        # is shifted by.
+        self.source_vars = {
+            "db": config.basex.database,
+            "tzOffset": config.mapping.timezone_offset,
+        }
 
     # -- helpers ---------------------------------------------------------
 
@@ -410,10 +432,9 @@ class Provider:
         with_payload: bool,
     ) -> Page:
         limit = self.config.protocol.page_size
-        db = self.config.basex.database
         nodes = await self.client.query_nodes(
             self.builder.page_query(),
-            db=db,
+            **self.source_vars,
             set=set_spec,
             **{"from": from_},
             until=until,
@@ -442,10 +463,11 @@ class Provider:
     async def count_matching(self, *, set_spec: str, from_: str, until: str) -> int:
         text = await self.client.query(
             self.builder.count_query(),
-            db=self.config.basex.database,
+            **self.source_vars,
             set=set_spec,
             **{"from": from_},
             until=until,
+            withPayload="false",
         )
         return int(text.strip() or 0)
 
@@ -471,8 +493,9 @@ class Provider:
         if identifier:
             rows = await self.client.query_nodes(
                 self.builder.record_query(),
-                db=self.config.basex.database,
+                **self.source_vars,
                 identifier=identifier,
+                withPayload="false",
             )
             if not rows:
                 raise ProtocolError(
@@ -486,10 +509,10 @@ class Provider:
         return node
 
     async def list_sets(self, request: Request) -> ET.Element:
-        if not self.config.mapping.sets:
+        if not self.set_rules:
             raise ProtocolError("noSetHierarchy", "this repository has no sets")
         node = ET.Element(q("ListSets"))
-        for rule in self.config.mapping.sets:
+        for rule in self.set_rules:
             item = _el(node, "set")
             _el(item, "setSpec").text = rule.spec
             _el(item, "setName").text = rule.label
@@ -500,8 +523,9 @@ class Provider:
         identifier = request.args["identifier"]
         rows = await self.client.query_nodes(
             self.builder.record_query(),
-            db=self.config.basex.database,
+            **self.source_vars,
             identifier=identifier,
+            withPayload="true",
         )
         if not rows:
             raise ProtocolError("idDoesNotExist", f"unknown identifier: {identifier}")
@@ -556,7 +580,7 @@ class Provider:
             )
             set_spec = request.args.get("set", "")
             if set_spec:
-                known = {r.spec for r in self.config.mapping.sets}
+                known = {r.spec for r in self.set_rules}
                 if set_spec not in known:
                     # unknown set: noRecordsMatch with the right message beats
                     # a silent empty page

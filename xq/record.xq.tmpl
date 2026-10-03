@@ -1,23 +1,20 @@
 (: One record by identifier, for GetRecord. Returns nothing if absent, so
    the caller can raise idDoesNotExist. A tombstone yields the header with no
    payload - GetRecord for a deleted record must not invent metadata.
+
+   The identifier is globally unique because each module tags its records with
+   its own prefix (EM-object-, EM-person-, EM-asset-), so a search across all
+   sources finds exactly one - the caller need not know which database holds it.
 :)
 {{NAMESPACES}}
+{{OAI_DATE_FUNCTION}}
 
 declare variable $db external;
+declare variable $tzOffset external;
 declare variable $identifier external;
+declare variable $withPayload external;
 
-let $r := collection($db)/{{ENVELOPE_PREFIX}}:record[
-    @{{ENVELOPE_PREFIX}}:identifier = $identifier]
-
+let $rows := {{SOURCE}}
 return
-  if (empty($r)) then ()
-  else
-    <row datestamp="{$r/@{{ENVELOPE_PREFIX}}:datestamp}"
-         identifier="{$r/@{{ENVELOPE_PREFIX}}:identifier}"
-         status="{string($r/@{{ENVELOPE_PREFIX}}:status)}"
-         sets="{string-join($r/{{ENVELOPE_PREFIX}}:set, ' ')}">{
-      if (string($r/@{{ENVELOPE_PREFIX}}:status) ne 'deleted')
-      then $r/{{ENVELOPE_PREFIX}}:source/node()
-      else ()
-    }</row>
+  if (empty($rows[@identifier = $identifier])) then ()
+  else $rows[@identifier = $identifier]

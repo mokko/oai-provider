@@ -87,6 +87,31 @@ python tools/ingest.py sdata/Dump.xml --keep        # overwrite in place
   record) — so each module carries an identifier prefix: `EM-object-`,
   `EM-person-`, `EM-asset-`.
 
+### Serving from the module databases
+
+With `[[modules]]` present the six verbs read **all the module databases** and
+serve one OAI repository. The two storage shapes are normalized to a single
+`<row>` (identifier, datestamp, status, sets + payload), so paging, the
+resumption-token cursor, set filtering and `GetRecord` have **one code path**
+whether the data is enveloped or module-split.
+
+- **A record has no envelope**, so `identifier` and `datestamp` are derived per
+  module at query time — `identifierPrefix` + `@id`, and
+  `systemField[@name='__lastModified']/value` shifted to UTC by
+  `mapping.timezoneOffset`. Each `[[modules]]` entry may override `records`,
+  `identifier` and `datestamp`, and carries its own `[[modules.sets]]`
+  allow-list.
+- **The cursor spans the union**: rows from every module are sorted by
+  `(datestamp, identifier)`. Identifiers are globally unique because of the
+  module prefixes, so the pair is a total order across databases and a harvest
+  neither skips nor repeats a record.
+- **`deletedRecord` is not yet honest in module mode.** A module database is a
+  full-dump resync that is dropped and rebuilt, so nothing records what
+  vanished, and no tombstone is ever served. Until an ingest pass keeps a
+  previous-dump snapshot to diff against, module mode should advertise
+  `deletedRecord = "no"` rather than `"persistent"`. This is the one open
+  decision on the serving side.
+
 ## Sets
 
 Sets are an **explicit allow-list** (`[[mapping.sets]]`). Each entry pairs an
