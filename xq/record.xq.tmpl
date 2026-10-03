@@ -5,6 +5,10 @@
    The identifier is globally unique because each module tags its records with
    its own prefix (EM-object-, EM-person-, EM-asset-), so a search across all
    sources finds exactly one - the caller need not know which database holds it.
+
+   Same split as paging: {{SOURCE}} gives the header, {{PAYLOADS}} attaches the
+   payload for the record asked for. A derived format (oai_dc) is built there
+   too, so it is assembled for the record actually served.
 :)
 {{NAMESPACES}}
 {{FORMAT_NAMESPACES}}
@@ -16,6 +20,15 @@ declare variable $identifier external;
 declare variable $withPayload external;
 
 let $rows := {{SOURCE}}
+let $wanted := $rows[@identifier = $identifier]
+let $payloads := if ($withPayload = 'true') then {{PAYLOADS}} else ()
+
 return
-  if (empty($rows[@identifier = $identifier])) then ()
-  else $rows[@identifier = $identifier]
+  for $r in $wanted
+  return
+    <row datestamp="{$r/@datestamp}"
+         identifier="{$r/@identifier}"
+         status="{$r/@status}"
+         sets="{$r/@sets}">{
+      $payloads[@id = $r/@identifier]/node()
+    }</row>

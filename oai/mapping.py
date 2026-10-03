@@ -86,29 +86,79 @@ class QueryBuilder:
         """
         return bool(self.modules)
 
-    def source_expr(self, fmt=None) -> str:
-        """An XQuery expression yielding unfiltered `<row>` elements.
+    def source_expr(self) -> str:
+        """Header rows: datestamp, identifier, status, sets - and **never a
+        payload**.
 
-        A row carries `datestamp`, `identifier`, `status` and `sets` as
-        attributes and the payload as its only child (when `$withPayload` is
-        `'true'`). Every row lives in NO namespace, which is what lets the page,
-        count and record templates be identical for both modes.
+        Paging orders these, and the sort must not carry records it is about to
+        discard. Measured before the split: `ListRecords` cost the same for a
+        page of 1 as for a page of 100 (6.5s), because every one of the 5,884
+        matching payloads was attached before the page was chosen and sorted
+        away. The payload is attached afterwards, for the page alone - see
+        `payload_expr`.
 
-        `fmt` is the requested metadata format: a **derived** one turns the
-        payload into the built element (oai_dc) right here, so the templates
-        stay ignorant of formats and `Provider._metadata` keeps appending row
-        children whatever they are.
+        Rows live in NO namespace, which is what lets the page, count and
+        record templates be identical for both storage modes.
         """
         if self.modules:
-            return self._module_source(fmt)
-        return self._envelope_source(fmt)
+            return self._module_source()
+        return self._envelope_source()
+
+    # -- the payload, fetched for the page and nothing else ---------------
+
+    def payload_expr(self, fmt=None) -> str:
+        """`<p id="…">payload</p>` for exactly the records in `$wanted`.
+
+        `$wanted` is the page's rows: one scan per module, filtered to those
+        identifiers, instead of a payload attached to every match. A derived
+        format (oai_dc) is built here rather than in the source, so it too is
+        assembled only for what is served.
+        """
+        if self.modules:
+            blocks = ",\n".join(self._module_payload(m, fmt) for m in self.modules)
+            return f"(\n{blocks}\n)"
+        return self._envelope_payload(fmt)
+
+    def _envelope_payload(self, fmt=None) -> str:
+        env = ENVELOPE_PREFIX
+        # In the enveloped store the record is INSIDE env:source, so terms are
+        # relative to that element, not to the envelope itself.
+        base = f"$d/{env}:source"
+        body = self._metadata_branch(
+            fmt, fmt.terms if fmt else (), f"{base}/node()", base
+        )
+        return (
+            f"for $d in collection($db)/{env}:record\n"
+            f"let $id := string($d/@{env}:identifier)\n"
+            f"where $id = $wanted/@identifier\n"
+            f"  and string($d/@{env}:status) ne 'deleted'\n"
+            f'return <p id="{{$id}}">{{ {body} }}</p>'
+        )
+
+    def _module_payload(self, module, fmt=None) -> str:
+        terms = module.terms or (fmt.terms if fmt else ())
+        body = self._metadata_branch(fmt, terms, "$src", "$src")
+        prefix = _xq_string(module.identifier_prefix)
+        return (
+            f"for $src in collection({_xq_string(module.database)})"
+            f"{module.records_xpath()}\n"
+            f"let $id := concat({prefix}, string($src/{module.identifier}))\n"
+            f"where $id = $wanted/@identifier\n"
+            f'return <p id="{{$id}}">{{ {body} }}</p>'
+        )
 
     # -- what goes inside <metadata> -------------------------------------
 
-    def _metadata_branch(self, fmt, terms, fallback: str) -> str:
-        """The expression that becomes a row's child."""
+    def _metadata_branch(self, fmt, terms, fallback: str, base: str = "$r") -> str:
+        """The expression that becomes a row's child.
+
+        `base` names the variable holding the record: `$r` in the source,
+        `$src`/`$d/env:source` in the payload phase - the term XPaths are
+        relative to *that*, and a stale variable name is an XPST0008 at query
+        time rather than anything a unit test would catch.
+        """
         if fmt is not None and fmt.kind == "derived":
-            inner = self._term_exprs(terms or fmt.terms)
+            inner = self._term_exprs(terms or fmt.terms, base)
             # **The terms go in an enclosed expression, not bare inside the
             # element.** A direct element constructor treats everything between
             # the tags as text unless it is inside { }, so an unbraced `for $v
@@ -116,7 +166,7 @@ class QueryBuilder:
             return f"<{fmt.wrapper}>{{ {inner} }}</{fmt.wrapper}>"
         return fallback
 
-    def _term_exprs(self, terms) -> str:
+    def _term_exprs(self, terms, base: str = "$r") -> str:
         """One expression per DC term, in the order configured.
 
         A term whose XPath selects nothing - or selects an empty `<value/>` -
@@ -130,7 +180,9 @@ class QueryBuilder:
                 continue
             # relative to the record; a leading / means "search down from it"
             path = (
-                f"$r{rule.xpath}" if rule.xpath.startswith("/") else f"$r/{rule.xpath}"
+                f"{base}{rule.xpath}"
+                if rule.xpath.startswith("/")
+                else f"{base}/{rule.xpath}"
             )
             parts.append(
                 f"for $v in ({path})[normalize-space(string(.)) ne '']\n"
@@ -152,37 +204,27 @@ class QueryBuilder:
             for p, uri in sorted(fmt.namespaces.items())
         )
 
-    def _envelope_source(self, fmt=None) -> str:
+    def _envelope_source(self) -> str:
         env = ENVELOPE_PREFIX
-        branch = self._metadata_branch(fmt, fmt.terms if fmt else (), f"$r/{env}:source/node()")
         return (
             f"for $r in collection($db)/{env}:record\n"
             "return\n"
             f'  <row datestamp="{{$r/@{env}:datestamp}}"\n'
             f'       identifier="{{$r/@{env}:identifier}}"\n'
             f'       status="{{string($r/@{env}:status)}}"\n'
-            f'       sets="{{string-join($r/{env}:set, \' \')}}">{{\n'
-            "    if ($withPayload = 'true'\n"
-            f"        and string($r/@{env}:status) ne 'deleted')\n"
-            f"    then {branch}\n"
-            "    else ()\n"
-            "  }</row>"
+            f'       sets="{{string-join($r/{env}:set, \' \')}}"/>'
         )
 
-    def _module_source(self, fmt=None) -> str:
-        blocks = ",\n".join(self._module_block(m, fmt) for m in self.modules)
+    def _module_source(self) -> str:
+        blocks = ",\n".join(self._module_block(m) for m in self.modules)
         return f"(\n{blocks}\n)"
 
-    def _module_block(self, module, fmt=None) -> str:
+    def _module_block(self, module) -> str:
         records = module.records_xpath()
         ident = module.identifier
         ds = module.datestamp
         prefix = _xq_string(module.identifier_prefix)
         sets = self._set_expressions(module.sets)
-        # A module's records are their own shape, so it may carry its own
-        # terms; without them the format's shared mapping is used.
-        terms = module.terms or (fmt.terms if fmt else ())
-        branch = self._metadata_branch(fmt, terms, "$r")
         return (
             f"for $r in collection({_xq_string(module.database)}){records}\n"
             f"let $raw := string($r/{ident})\n"
@@ -193,10 +235,7 @@ class QueryBuilder:
             '  <row datestamp="{$ds}"\n'
             f'       identifier="{{concat({prefix}, $raw)}}"\n'
             '       status=""\n'
-            '       sets="{string-join($sets, \' \')}">{\n'
-            f"    if ($withPayload = 'true') then {branch}\n"
-            "    else ()\n"
-            "  }</row>"
+            '       sets="{string-join($sets, \' \')}"/>'
         )
 
 
@@ -248,7 +287,8 @@ class QueryBuilder:
             "IDENTIFIER_EXPR": self.identifier_expr(),
             "DATESTAMP_EXPR": self.datestamp_expr(),
             "SET_EXPRESSIONS": self.set_expressions(),
-            "SOURCE": self.source_expr(fmt),
+            "SOURCE": self.source_expr(),
+            "PAYLOADS": self.payload_expr(fmt),
             "TZOFFSET": self.mapping.timezone_offset,
             **extra,
         }

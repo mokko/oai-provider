@@ -235,9 +235,27 @@ xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
 ### Scale
 
 Paging orders the whole matching set in BaseX (`order by` in `xq/page.xq.tmpl`)
-and `ListRecords` fetches payloads in the same query, rather than seeking an
-index. Fine for tens of thousands of records; worth an index and a seek before
-this carries a large collection.
+rather than seeking an index — fine at this size, worth an index and a seek
+before it carries a large collection.
+
+**The payload is fetched after the page is chosen, not before.** `{{SOURCE}}`
+yields header rows only; the order-by sorts what it can afford, and
+`{{PAYLOADS}}` attaches the payload for the page's identifiers alone. Attaching
+payloads in the source and then sorting them was the entire cost of
+`ListRecords`, and it showed as a flat curve — a page of 1 and a page of 100
+cost the same, because all 5,884 matching records were materialised and then
+discarded:
+
+| | before | after |
+|---|---|---|
+| `ListRecords` page_size=1 | 6.49s | 1.14s |
+| `ListRecords` page_size=100 | 6.63s | 1.34s |
+| `ListRecords` page_size=1000 | 8.80s | 6.72s |
+| `ListIdentifiers` page_size=100 | 0.88s | 0.88s |
+
+The tell that the fix is real is that the time now **scales with page size**
+instead of being constant. `oai_dc` benefits identically — it is built in the
+payload phase, so Dublin Core is assembled only for records actually served.
 
 ## Mapping notes that cost real round trips
 

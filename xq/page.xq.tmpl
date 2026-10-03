@@ -10,9 +10,12 @@
    $until is pinned on the first page and carried in the resumption token, so
    a re-ingest during a harvest cannot move a record across a page boundary.
 
-   The rows come from {{SOURCE}}, which is either the envelope database or the
-   per-module databases. Both yield the same no-namespace <row> shape, so
-   nothing below has to know which storage is behind it.
+   **The payload is fetched after the page is chosen, not before.** {{SOURCE}}
+   yields headers only, so the order-by sorts rows it can afford to carry, and
+   only the page's rows get a payload attached, from {{PAYLOADS}}. Attaching
+   payloads in the source and then sorting them was the whole cost of
+   ListRecords: page_size=1 and page_size=100 measured the same, because all
+   5,884 matching records were materialised and then discarded.
 :)
 {{NAMESPACES}}
 {{FORMAT_NAMESPACES}}
@@ -56,8 +59,17 @@ let $matching :=
 
 (: limit + 1, so the caller can tell whether another page exists without a
    second query. :)
+let $wanted := subsequence($matching, 1, $limit + 1)
+let $payloads := if ($withPayload = 'true') then {{PAYLOADS}} else ()
+
 return
   <page>{
-    for $r in subsequence($matching, 1, $limit + 1)
-    return $r
+    for $r in $wanted
+    return
+      <row datestamp="{$r/@datestamp}"
+           identifier="{$r/@identifier}"
+           status="{$r/@status}"
+           sets="{$r/@sets}">{
+        $payloads[@id = $r/@identifier]/node()
+      }</row>
   }</page>

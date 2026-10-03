@@ -125,7 +125,7 @@ def test_the_terms_sit_in_an_enclosed_expression() -> None:
     text and its $v is undeclared - the bug this pins."""
     fmt = _builder_with_dc()
     qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
-    expr = qb.source_expr(fmt)
+    expr = qb.payload_expr(fmt)
     assert "<oai_dc:dc>{ " in expr
     assert "$v" in expr
 
@@ -134,24 +134,47 @@ def test_an_empty_value_emits_nothing() -> None:
     """The core promise: no blank dc elements."""
     fmt = _builder_with_dc()
     qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
-    expr = qb.source_expr(fmt)
+    expr = qb.payload_expr(fmt)
     assert "normalize-space(string(.)) ne ''" in expr
 
 
-def test_the_passthrough_format_is_unchanged() -> None:
-    """With no format (or a passthrough one) the payload is served as it is."""
+def test_the_source_never_carries_a_payload() -> None:
+    """The whole point of the split: the order-by sorts rows that hold only
+    headers, and the payload is fetched afterwards for the page alone.
+    Measured before the fix: page_size=1 and page_size=100 cost the same,
+    because every matching payload was attached and then discarded."""
     cfg = Config.load(ROOT / "oai.toml")
     qb = QueryBuilder(cfg.mapping, cfg.modules)
-    ria = next(f for f in cfg.formats if f.prefix == "ria")
-    expr = qb.source_expr(ria)
-    assert "oai_dc" not in expr
-    assert "then $r" in expr
+    src = qb.source_expr()
+    assert "<row " in src
+    assert "$withPayload" not in src, "the source must not depend on withPayload"
+    assert "$src" not in src and ":source/node()" not in src
+    # and every header row is empty
+    assert src.count("/>") == src.count("<row ")
+
+
+def test_the_payload_phase_keys_on_the_page() -> None:
+    cfg = Config.load(ROOT / "oai.toml")
+    qb = QueryBuilder(cfg.mapping, cfg.modules)
+    for fmt in (None, next(f for f in cfg.formats if f.prefix == "ria")):
+        expr = qb.payload_expr(fmt)
+        assert "$wanted/@identifier" in expr, "payload must be filtered to the page"
+        assert "<p id=" in expr
 
 
 def test_a_literal_is_xml_escaped() -> None:
     qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
     expr = qb._term_exprs((TermRule(term="dc:language", literal="a & b <c>"),))
     assert "a &amp; b &lt;c&gt;" in expr
+
+
+def test_terms_are_relative_to_the_variable_that_holds_the_record() -> None:
+    """In the payload phase the record is $src (module mode) or $d/env:source
+    (envelope mode), never $r - a stale name is an XPST0008 at query time."""
+    qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
+    expr = qb._term_exprs((TermRule(term="dc:type", xpath="a/b"),), "$src")
+    assert "($src/a/b)" in expr
+    assert "$r/" not in expr
 
 
 # -- the round trip -------------------------------------------------------
