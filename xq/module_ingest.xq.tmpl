@@ -1,0 +1,57 @@
+(: Ingest ONE MuseumPlus module into a database of its own, namespace-stripped,
+   one document per record, in the shape the colleague's sync_* databases use,
+   so that a query written for his setup reads identically against ours:
+
+       collection('sync_Object')/application/modules/module[@name='Object']/moduleItem
+
+   The wrapper (application/modules/module) is why a per-record document still
+   answers that path: every stored document carries it, so the path selects the
+   one moduleItem inside.
+
+   Updating query: it stores and returns nothing. BaseX does not allow an
+   updating expression to be mixed with a returning one.
+:)
+declare variable $path external;
+declare variable $db external;
+declare variable $moduleName external;
+
+(: Drop every namespace from a node, keeping the names. BaseX has no built-in
+   "strip all namespaces", so the tree is rebuilt with local-name() - element
+   and attribute names survive, the namespace URIs do not. The original file on
+   disk is never touched; the stored copy is what is no longer verbatim, which
+   is the deliberate exception to the "payload verbatim" rule.
+
+   The default branch returns the node unchanged, so text and comments pass
+   straight through. :)
+declare function local:strip($n as node()?) as node()? {
+  typeswitch ($n)
+    case element() return
+      element { local-name($n) } {
+        (for $a in $n/@* return attribute { local-name($a) } { string($a) }),
+        ($n/node() ! local:strip(.))
+      }
+    case document-node() return document { $n/node() ! local:strip(.) }
+    default return $n
+};
+
+let $doc := parse-xml(file:read-text($path))
+(: *:name so this works whether or not the dump still carries its namespace -
+   the same query serves both dialects, which is the point of stripping. :)
+let $module := $doc/*:application/*:modules/*:module[@name = $moduleName]
+(: The module's own attributes (@name, @totalSize) are carried onto the stored
+   module element, so the wrapper says which module it is. :)
+let $header := (for $a in $module/@* return attribute { local-name($a) } { string($a) })
+
+for $item in $module/*:moduleItem
+let $id := string($item/@id)
+where $id ne ''
+return db:put($db,
+  element application {
+    element modules {
+      element module {
+        $header,
+        local:strip($item)
+      }
+    }
+  },
+  concat($moduleName, '-', $id, '.xml'))

@@ -155,8 +155,13 @@ def test_token_is_opaque_not_readable() -> None:
 def test_tampered_token_is_rejected() -> None:
     token = encode_token(state(), SECRET)
     body, _, sig = token.partition(".")
-    # flip the last character of the signature
-    forged = body + "." + sig[:-1] + ("A" if sig[-1] != "A" else "B")
+    # Flip a character *inside* the signature, never the last one. The base64
+    # is unpadded, so the final character carries padding bits: changing only
+    # those decodes to the very same bytes, the signature still verifies, and
+    # the test would fail for a reason that is not the feature. A character
+    # that is not last always changes the decoded bytes.
+    at = len(sig) // 2
+    forged = body + "." + sig[:at] + ("A" if sig[at] != "A" else "B") + sig[at + 1 :]
     with pytest.raises(ProtocolError) as err:
         decode_token(forged, SECRET, fp(), ttl=3600)
     assert err.value.code == "badResumptionToken"

@@ -1,0 +1,18 @@
+(: Read-only: how many records does one module of this dump hold? The report
+   a write pass cannot give, because a query is either updating or returning.
+
+   `declared` is the module's own totalSize - the *server's* result size at
+   export, not this file's count - so it is reported beside `items` and never
+   trusted as the number of records. A mismatch is normal for a chunk.
+:)
+declare variable $path external;
+declare variable $moduleName external;
+
+let $doc := parse-xml(file:read-text($path))
+let $module := $doc/*:application/*:modules/*:module[@name = $moduleName]
+
+return
+  <module name="{$moduleName}"
+          declared="{string($module/@totalSize)}"
+          items="{count($module/*:moduleItem)}"
+          withId="{count($module/*:moduleItem[@id])}"/>

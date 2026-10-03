@@ -154,12 +154,39 @@ class MetadataFormat:
 
 
 @dataclass(frozen=True)
+class ModuleConfig:
+    """One MuseumPlus module, ingested into a database of its own.
+
+    This emulates the colleague's `sync_<Type>` layout: a database per module,
+    namespaces stripped on the way in, and records stored so that
+
+        collection('sync_Object')/application/modules/module[@name='Object']/moduleItem
+
+    reads exactly like his own queries. The module name is the one in the
+    dump (`module/@name`); it is also what tells two otherwise identical
+    records apart, so it is carried in the OAI identifier prefix.
+    """
+
+    name: str
+    database: str
+    identifier_prefix: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ConfigError("module.name is required")
+        if not self.database.strip():
+            raise ConfigError(f"module {self.name!r} has no database")
+
+
+@dataclass(frozen=True)
 class Config:
     identity: Identity
     basex: BaseXSettings
     mapping: Mapping
     protocol: ProtocolSettings = field(default_factory=ProtocolSettings)
     formats: tuple[MetadataFormat, ...] = ()
+    modules: tuple[ModuleConfig, ...] = ()
+
 
     @classmethod
     def load(cls, path: str | Path) -> Config:
@@ -232,6 +259,21 @@ class Config:
         if len(specs) != len(set(specs)):
             raise ConfigError("duplicate setSpec in [mapping.sets]")
 
+        modules = tuple(
+            ModuleConfig(
+                name=m.get("name", ""),
+                database=m.get("database", ""),
+                identifier_prefix=m.get("identifierPrefix", ""),
+            )
+            for m in raw.get("modules", [])
+        )
+        module_dbs = [m.database for m in modules]
+        if len(module_dbs) != len(set(module_dbs)):
+            raise ConfigError("two [[modules]] entries share a database")
+        module_names = [m.name for m in modules]
+        if len(module_names) != len(set(module_names)):
+            raise ConfigError("duplicate module name in [[modules]]")
+
         mapping = Mapping(
             records=map_raw["records"],
             identifier=map_raw["identifier"],
@@ -281,6 +323,7 @@ class Config:
             mapping=mapping,
             protocol=protocol,
             formats=formats,
+            modules=modules,
         )
 
 

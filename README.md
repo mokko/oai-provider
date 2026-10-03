@@ -52,6 +52,41 @@ liveness to the source.
 The dump id is a content hash, so re-running an unchanged dump is idempotent
 and cannot be mistaken for a dump that lost records.
 
+## Module mode — one database per module
+
+A MuseumPlus RIA dump carries several modules in one file (Object, Person,
+Multimedia). With a `[[modules]]` block in `oai.toml` the ingest switches to
+**module mode**: each module is split out into its own database, namespaces
+stripped, records stored so that a query written for the colleague's `sync_*`
+setup reads identically here:
+
+```
+collection('sync_Object')/application/modules/module[@name='Object']/moduleItem
+```
+
+```
+python tools/ingest.py sdata/Dump.xml --dry-run     # per-module counts only
+python tools/ingest.py sdata/Dump.xml               # drop and rebuild each db
+python tools/ingest.py sdata/Dump.xml --keep        # overwrite in place
+```
+
+- **Databases are `sync_<Name>`** — `sync_Object`, `sync_Person`,
+  `sync_Multimedia` — matching the layout this is meant to be installed into.
+- **Each module is a full-dump resync**: its database is dropped and rebuilt,
+  because the source records no deletes and an overwrite would leave a vanished
+  record behind. Per-module databases also mean one module missing from a chunk
+  can never tombstone another module's records.
+- **Namespaces are stripped on the way in** (a recursive XQuery `local:strip()`
+  rebuilds each element with `local-name()`). The original file is never
+  touched; the stored copy is the one deliberate exception to "payload stored
+  verbatim". Stripping conflates the four RIA dialects, which is harmless while
+  every record is a module response.
+- **The module tag distinguishes the records.** `@id` is unique only within a
+  module — the ranges overlap (Object reaches 935894, Person 1764036,
+  Multimedia 8533256, and one id appears as both an Object and a Multimedia
+  record) — so each module carries an identifier prefix: `EM-object-`,
+  `EM-person-`, `EM-asset-`.
+
 ## Sets
 
 Sets are an **explicit allow-list** (`[[mapping.sets]]`). Each entry pairs an

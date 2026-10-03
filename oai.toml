@@ -85,3 +85,37 @@ prefix = "ria"
 namespace = "http://www.zetcom.com/ria/ws/module"
 schema = ""
 kind = "passthrough"
+
+# ---------------------------------------------------------------------------
+# One MuseumPlus module, one database - the colleague's `sync_<Type>` layout.
+#
+# This is what the ingest writes in module mode (`[[modules]]` present): the
+# dump is split by module, each module's records are stored namespace-stripped
+# under
+#     application/modules/module[@name='<Name>']/moduleItem
+# in its own database, so a query written for his setup reads identically:
+#     collection('sync_Object')/application/modules/module[@name='Object']/moduleItem
+#
+# `identifierPrefix` is the module's tag in the OAI identifier. It is what
+# makes the three modules' records distinct: the integer @id is unique only
+# *within* a module (Object reaches 935894 while Person reaches 1764036 and
+# Multimedia 8533256, so the ranges overlap and one id already appears as both
+# an Object and a Multimedia record).
+#
+# `name` is the module name exactly as the dump spells it (module/@name).
+
+[[modules]]
+name = "Object"
+database = "sync_Object"
+identifierPrefix = "spk-berlin.de:EM-object-"
+
+[[modules]]
+name = "Person"
+database = "sync_Person"
+identifierPrefix = "spk-berlin.de:EM-person-"
+
+[[modules]]
+name = "Multimedia"
+database = "sync_Multimedia"
+identifierPrefix = "spk-berlin.de:EM-asset-"
+

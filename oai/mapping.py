@@ -121,6 +121,14 @@ class QueryBuilder:
     def record_query(self) -> str:
         return self.render("record.xq.tmpl")
 
+    def module_ingest_query(self) -> str:
+        """Ingest one module into its own database (see the template)."""
+        return self.render("module_ingest.xq.tmpl")
+
+    def module_count_query(self) -> str:
+        """Read-only record count for one module of a dump."""
+        return self.render("module_count.xq.tmpl")
+
     def fingerprint(self) -> str:
         """A digest of the mapping, so a resumption token issued under one
         mapping is not honoured under another.

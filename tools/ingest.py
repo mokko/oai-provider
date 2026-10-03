@@ -55,6 +55,9 @@ async def run(args: argparse.Namespace) -> int:
         print(f"dump not found: {dump}", file=sys.stderr)
         return 2
 
+    if config.modules:
+        return await run_modules(args, config, builder)
+
     dump_id = dump_id_for(dump, args.dump_id)
     variables = {
         "path": str(dump.resolve()),
@@ -161,6 +164,94 @@ async def run(args: argparse.Namespace) -> int:
         return 0
 
 
+async def run_modules(args: argparse.Namespace, config, builder) -> int:
+    """Ingest every configured module into its own database.
+
+    This is the layout that emulates the colleague's setup: one database per
+    module (`sync_Object`, `sync_Person`, `sync_Multimedia`), namespaces
+    stripped, records stored under
+
+        application/modules/module[@name='<Name>']/moduleItem
+
+    so his own queries read against our databases unchanged.
+
+    Each module is a **full-dump resync**: the database is dropped and rebuilt,
+    because the source records no deletes and re-running must not leave a
+    vanished record behind. Per-module databases also mean one module's absence
+    from a chunk can never touch another's records - the failure a single
+    reconciled database has.
+    """
+    dump = Path(args.dump).resolve()
+    path = str(dump)
+    written = 0
+    async with BaseXClient(
+        config.basex.url,
+        config.basex.user,
+        config.basex.password,
+        timeout=config.basex.timeout,
+    ) as bx:
+        if not await bx.ping():
+            print(f"BaseX is not answering at {config.basex.url}", file=sys.stderr)
+            return 3
+        if not config.basex.from_env:
+            print(
+                "warning: BaseX password came from the config file. "
+                "Prefer OAI_BASEX_PASSWORD before this is exposed.",
+                file=sys.stderr,
+            )
+
+        for module in config.modules:
+            t0 = time.monotonic()
+            report = await bx.query_xml(
+                builder.module_count_query(), path=path, moduleName=module.name
+            )
+            if report is None:
+                print(f"{module.name}: not present in this dump", file=sys.stderr)
+                return 4
+            items = int(report.get("items", "0"))
+            with_id = int(report.get("withId", "0"))
+            declared = report.get("declared", "")
+            print(
+                f"{module.name}: {items} record(s) "
+                f"(server declared {declared or '?'}), {with_id} with an id "
+                f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
+            )
+            if args.dry_run:
+                continue
+            if items == 0:
+                print(
+                    f"refusing to write an empty {module.name} module "
+                    "(a bad module name would otherwise drop the whole database)",
+                    file=sys.stderr,
+                )
+                return 5
+
+            if await bx.database_exists(module.database) and not args.keep:
+                await bx.drop_database(module.database)
+            if not await bx.database_exists(module.database):
+                await bx.create_database(module.database)
+
+            t1 = time.monotonic()
+            await bx.query(
+                builder.module_ingest_query(),
+                path=path,
+                db=module.database,
+                moduleName=module.name,
+            )
+            stored = await bx.count_documents(module.database)
+            written += stored
+            print(
+                f"  ingest: {stored} document(s) in '{module.database}' "
+                f"({time.monotonic() - t1:.1f}s)"
+            )
+
+    if args.dry_run:
+        print("dry run: nothing written")
+    else:
+        print(f"done: {written} document(s) across {len(config.modules)} database(s)")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("dump", help="the big multi-record XML file")
@@ -168,6 +259,12 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="validate only")
     parser.add_argument("--dump-id", default=None, help="override the dump identity")
     parser.add_argument("--no-reconcile", action="store_true")
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="module mode: overwrite records in place instead of dropping the "
+        "database first (leaves records the new dump no longer contains)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--limit", type=int, default=20)
     args = parser.parse_args()

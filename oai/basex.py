@@ -144,6 +144,10 @@ class BaseXClient:
     async def create_database(self, name: str) -> None:
         await self.command(f"CREATE DB {name}")
 
+    async def database_exists(self, name: str) -> bool:
+        text = await self.query(f"db:exists({name!r})")
+        return text.strip() == "true"
+
     async def drop_database(self, name: str) -> None:
         await self.command(f"DROP DB {name}")
 
@@ -152,4 +156,9 @@ class BaseXClient:
             'declare namespace env = "' + envelope_ns + '";'
             f"count(collection({database!r})/env:record)"
         )
+        return int(text.strip() or 0)
+
+    async def count_documents(self, database: str) -> int:
+        """How many documents a database holds, envelope or not."""
+        text = await self.query(f"count(collection({database!r}))")
         return int(text.strip() or 0)
