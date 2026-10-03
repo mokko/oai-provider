@@ -85,6 +85,19 @@ def test_a_module_without_a_database_is_rejected(tmp_path) -> None:
         Config.load(bad)
 
 
+def test_module_mode_refuses_a_deleted_record_policy(tmp_path) -> None:
+    """Module databases are dropped and rebuilt, so no tombstone can be served.
+    Advertising "persistent" would be the one lie a harvester cannot detect, so
+    the combination is rejected at load time rather than documented."""
+    text = (ROOT / "oai.toml").read_text().replace(
+        'deletedRecord = "no"', 'deletedRecord = "persistent"'
+    )
+    bad = tmp_path / "bad.toml"
+    bad.write_text(text)
+    with pytest.raises(ConfigError, match="deletedRecord must be"):
+        Config.load(bad)
+
+
 # -- the generated queries ------------------------------------------------
 
 

@@ -27,9 +27,14 @@ TEST_DB_STRIPPED = "oai_provider_test_stripped"
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
+    # The shipped config is module mode with deletedRecord="no". This module
+    # exercises the **enveloped** path, where reconcile *can* tombstone, so
+    # [[modules]] is cleared and the persistent policy is pinned back on.
     return dataclasses.replace(
         cfg,
         basex=dataclasses.replace(cfg.basex, database=TEST_DB),
+        modules=(),
+        identity=dataclasses.replace(cfg.identity, deleted_record="persistent"),
     )
 
 

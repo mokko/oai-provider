@@ -42,12 +42,17 @@ broken mapping cannot tombstone the whole database.
 
 ### Deletions
 
+**The shipped configuration is module mode, where `deletedRecord = "no"`** —
+see "Serving from the module databases" above. The paragraph that follows
+describes the *enveloped* path, which reconciles and can therefore serve real
+tombstones.
+
 The source system does **not** record deletes, and a sync that only adds or
 overwrites will serve vanished objects as live forever. No harvester can
 recover from that. But the dump is complete, so absence is the delete signal:
-reconciling a full dump is what makes `deletedRecord = "persistent"` honest.
-Set `deletedRecord = "transient"` to remove instead, or `"no"` to leave
-liveness to the source.
+reconciling a full dump is what makes `deletedRecord = "persistent"` honest in
+the enveloped path. Set `deletedRecord = "transient"` to remove instead, or
+`"no"` to leave liveness to the source.
 
 The dump id is a content hash, so re-running an unchanged dump is idempotent
 and cannot be mistaken for a dump that lost records.
@@ -105,12 +110,13 @@ whether the data is enveloped or module-split.
   `(datestamp, identifier)`. Identifiers are globally unique because of the
   module prefixes, so the pair is a total order across databases and a harvest
   neither skips nor repeats a record.
-- **`deletedRecord` is not yet honest in module mode.** A module database is a
-  full-dump resync that is dropped and rebuilt, so nothing records what
-  vanished, and no tombstone is ever served. Until an ingest pass keeps a
-  previous-dump snapshot to diff against, module mode should advertise
-  `deletedRecord = "no"` rather than `"persistent"`. This is the one open
-  decision on the serving side.
+- **`deletedRecord` is `"no"` in module mode.** A module database is dropped and
+  rebuilt on every ingest, so nothing records what vanished and no tombstone is
+  ever served. Claiming `"persistent"` would be the one lie a harvester cannot
+  detect, so the combination is **rejected at load time** — module mode plus a
+  `deletedRecord` other than `"no"` is a configuration error, not a note in the
+  docs. The source owns liveness; a harvester learns of a withdrawal by
+  re-harvesting.
 
 ## Sets
 

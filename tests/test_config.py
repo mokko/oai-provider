@@ -22,7 +22,7 @@ def test_loads_the_real_config(config: Config) -> None:
     assert config.basex.database == "riadb"
     assert config.mapping.identifier == "@id"
     assert config.mapping.identifier_prefix == "spk-berlin.de:EM-objId-"
-    assert config.identity.deleted_record == "persistent"
+    assert config.identity.deleted_record == "no"
     assert {r.spec for r in config.mapping.sets} == {"mimo", "78"}
     assert {r.label for r in config.mapping.sets} == {
         "Musikinstrumente",
@@ -51,7 +51,7 @@ def test_reserved_envelope_prefix_is_rejected(tmp_path) -> None:
 
 def test_bad_deleted_record_is_rejected(tmp_path) -> None:
     text = (ROOT / "oai.toml").read_text().replace(
-        'deletedRecord = "persistent"', 'deletedRecord = "maybe"'
+        'deletedRecord = "no"', 'deletedRecord = "maybe"'
     )
     bad = tmp_path / "bad.toml"
     bad.write_text(text)

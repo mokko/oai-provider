@@ -26,13 +26,15 @@ OAI_HEADER = q("header")
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
     # These tests exercise the **enveloped** path: one database, env:record
-    # documents. The real oai.toml now also declares [[modules]] (the
-    # colleague's sync_* layout), which the Provider would otherwise prefer,
-    # so it is cleared here on purpose. The module path has its own test.
+    # documents. The real oai.toml is module mode with deletedRecord="no";
+    # [[modules]] is cleared and the persistent policy pinned back on here on
+    # purpose, because reconcile can tombstone in this mode. The module path
+    # has its own test.
     return dataclasses.replace(
         cfg,
         basex=dataclasses.replace(cfg.basex, database=TEST_DB),
         modules=(),
+        identity=dataclasses.replace(cfg.identity, deleted_record="persistent"),
     )
 
 

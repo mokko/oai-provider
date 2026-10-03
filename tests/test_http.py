@@ -27,11 +27,13 @@ TEST_DB = "oai_provider_http"
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
-    # the enveloped path (see test_verbs_basex): [[modules]] cleared on purpose
+    # the enveloped path (see test_verbs_basex): [[modules]] cleared, and the
+    # persistent policy it reconciles under pinned back on, on purpose
     return dataclasses.replace(
         cfg,
         basex=dataclasses.replace(cfg.basex, database=TEST_DB),
         modules=(),
+        identity=dataclasses.replace(cfg.identity, deleted_record="persistent"),
     )
 
 

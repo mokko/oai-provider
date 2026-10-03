@@ -312,6 +312,17 @@ class Config:
         module_names = [m.name for m in modules]
         if len(module_names) != len(set(module_names)):
             raise ConfigError("duplicate module name in [[modules]]")
+        # Module mode cannot report deletions: each database is dropped and
+        # rebuilt from a full dump, so nothing knows what vanished. Advertising
+        # "persistent" or "transient" while serving no tombstones is the one
+        # lie a harvester can never detect, so it is a configuration error
+        # rather than a note in the docs.
+        if modules and identity.deleted_record != "no":
+            raise ConfigError(
+                "module mode cannot report deletions (a module database is "
+                "dropped and rebuilt), so deletedRecord must be \"no\", not "
+                f"{identity.deleted_record!r}"
+            )
 
         mapping = Mapping(
             records=map_raw["records"],
