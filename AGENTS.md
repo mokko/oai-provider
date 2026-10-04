@@ -199,13 +199,11 @@ strict processor must find a **global** element declaration for the payload, and
 that is what makes the formats differ:
 
 - **`oai_dc`** — `oai_dc:dc` is global, so the whole document validates strictly.
-- **`ria`** — Zetcom's schema declares exactly one global element, `application`;
-  `moduleItem` is a **local** element, so no strict processor can resolve it.
-  The envelope is validated with that one wildcard relaxed, and the payload is
-  validated separately inside the `application/modules/module` skeleton the
-  schema declares — the same shape the ingest stores. Relaxing the wildcard is
-  not a free pass; it is used only where nothing could resolve, and that payload
-  is validated anyway.
+- **`ria`** — the payload is the **whole record document**, rooted at
+  `application`, Zetcom's schema's sole global element, so the payload validates
+  strictly as served. (`moduleItem` alone is a **local** element and would not
+  resolve — which is why the payload is the whole
+  `application/modules/module/moduleItem` tree, not a bare `moduleItem`.)
 - **`lido`** — **envelope only; content is not validated.** The vendored schema
   imports `xml.xsd` (2001-era URL) and GML 3.1.1 over plain http, so loading it
   fetches the GML tree — and the type xmlschema chokes on lives in **GML, not in
@@ -391,11 +389,14 @@ name-based predicate over a numeric id) before trusting any set rule.
 
 ## Payload
 
-The stored payload is the source record element **verbatim** — no filtering,
-no omissions. `tests/test_ingest_basex.py` asserts each stored payload
-`deep-equal`s the `moduleItem` it came from, so this cannot drift silently.
+The stored record keeps the source `moduleItem` **verbatim** — no filtering,
+no omissions. `tests/test_ingest_basex.py` asserts each stored `moduleItem`
+`deep-equal`s the one it came from, so this cannot drift silently.
 (Module mode's namespace stripping is the one deliberate exception, noted
-above.)
+above.) The `ria` format then serves that record as the **whole document** —
+`application/modules/module/moduleItem`, re-namespaced — rather than the bare
+`moduleItem`: only `application` is a global element, so a `moduleItem`-rooted
+payload is neither the record nor resolvable in Zetcom's schema.
 
 ## Scale
 

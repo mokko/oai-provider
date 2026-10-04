@@ -355,8 +355,9 @@ def test_the_shipped_mapping_serves_dublin_core_from_the_real_modules(
     )
     md = ria.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     # stored stripped, served namespaced: the wire payload must be admissible
-    # under <metadata>'s namespace="##other" wildcard
-    assert list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
+    # under <metadata>'s namespace="##other" wildcard. The payload is the whole
+    # record document (`application` root), which is the only GLOBAL element.
+    assert list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}application"
 
 
 def test_the_object_title_is_the_virtual_field(config: Config) -> None:

@@ -194,8 +194,13 @@ def test_get_record_returns_header_and_payload(cfg: Config) -> None:
     # the store is namespace-stripped; the wire is not. A namespace-free payload
     # is not admissible under <metadata>'s namespace="##other" wildcard, so the
     # RIA namespace is rebuilt at serve time (local:zetcom), as for the XSLT path.
-    assert payload.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
-    assert payload.get("id") == ident.rsplit("-", 1)[-1]
+    # And the payload is the whole record document (application root), not the
+    # bare `moduleItem`, which is a LOCAL element in Zetcom's schema.
+    z = "{http://www.zetcom.com/ria/ws/module}"
+    assert payload.tag == f"{z}application"
+    item = payload.find(f"{z}modules/{z}module/{z}moduleItem")
+    assert item is not None
+    assert item.get("id") == ident.rsplit("-", 1)[-1]
 
 
 def test_records_are_wrapped_as_the_schema_requires(cfg: Config) -> None:

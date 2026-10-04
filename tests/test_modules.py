@@ -399,9 +399,13 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     assert header.find(q("datestamp")).text == "2026-03-02T08:00:00Z"
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     item = list(md)[0]
-    assert item.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
     z = "{http://www.zetcom.com/ria/ws/module}"
-    name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
+    # the whole record document, not the bare moduleItem: `moduleItem` is a
+    # LOCAL element in Zetcom's schema, only `application` is global
+    assert item.tag == f"{z}application"
+    mi = item.find(f"{z}modules/{z}module[@name='Person']/{z}moduleItem")
+    assert mi is not None
+    name = mi.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
     assert name is not None and name.text == "Doe, Jane"
 
 
@@ -514,7 +518,7 @@ def test_list_records_carries_the_module_item_as_metadata(module_config: Config)
     mds = root.findall(f"{q('ListRecords')}/{q('record')}/{q('metadata')}")
     assert len(mds) == 3
     assert all(
-        list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
+        list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}application"
         for md in mds
     )
 

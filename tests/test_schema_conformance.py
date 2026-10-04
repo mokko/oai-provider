@@ -17,11 +17,9 @@ Why the strictness differs per format: `<metadata>` is
 must find a **global** element declaration for the payload.
 
 * `oai_dc:dc` is global ⇒ the whole document validates strictly.
-* `moduleItem` — the `ria` payload — is only a **local** element in Zetcom's
-  schema (the sole global element is `application`), so no strict processor can
-  resolve it. The envelope is validated with that one wildcard relaxed, and the
-  payload is validated separately, wrapped in the `application/modules/module`
-  skeleton the schema declares.
+* `application` — the `ria` payload — is Zetcom's sole **global** element, so the
+  payload validates strictly as served (`moduleItem` alone would not: it is only
+  a **local** element, which is why the payload is the whole document).
 """
 
 from __future__ import annotations
@@ -152,10 +150,11 @@ def test_get_record_validates(live: Config, an_identifier, fmt, strict) -> None:
 
 
 def test_the_ria_payload_is_valid_zetcom_module_xml(live: Config, an_identifier) -> None:
-    """The payload the wildcard could not resolve, validated where it lives.
+    """The whole record document, validated directly.
 
-    Zetcom's schema declares exactly one global element, `application`, so the
-    record is validated inside that skeleton — the same shape the ingest stores.
+    Zetcom's schema declares exactly one global element, `application`, and the
+    payload is now rooted there — so it validates as served, with no skeleton to
+    build around it.
     """
     body = _serve(
         live,
@@ -166,16 +165,10 @@ def test_the_ria_payload_is_valid_zetcom_module_xml(live: Config, an_identifier)
     payload = ET.fromstring(body).find(f".//{q('metadata')}")
     assert payload is not None and len(payload), "no payload served"
     record = list(payload)[0]
-    assert record.tag == f"{{{ZETCOM_NS}}}moduleItem", "payload is not Zetcom XML"
-
-    app = ET.Element(f"{{{ZETCOM_NS}}}application")
-    mods = ET.SubElement(app, f"{{{ZETCOM_NS}}}modules")
-    mod = ET.SubElement(mods, f"{{{ZETCOM_NS}}}module")
-    mod.set("name", "Object")
-    mod.append(record)
+    assert record.tag == f"{{{ZETCOM_NS}}}application", "payload is not Zetcom XML"
 
     schema = xmlschema.XMLSchema(str(DATA / "zetcom" / "module_1_6.xsd"))
-    schema.validate(ET.tostring(app, encoding="unicode"))
+    schema.validate(ET.tostring(record, encoding="unicode"))
 
 
 def test_lido_content_is_not_validated_yet() -> None:

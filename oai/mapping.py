@@ -240,14 +240,22 @@ class QueryBuilder:
         if fmt is not None and fmt.kind == "xslt":
             return self._xslt_payload(module, fmt)
         terms = self.terms_for(module, fmt)
-        # A passthrough format serves the stored record, and module ingest
-        # stripped that record of namespaces. OAI-PMH's <metadata> is declared
+        # A passthrough format serves the stored document, and module ingest
+        # stripped it of namespaces. OAI-PMH's <metadata> is declared
         # `<any namespace="##other" processContents="strict"/>`, and `##other`
         # excludes the *absent* namespace - so a namespace-free payload is not
         # admissible at all, however well-formed. Re-namespace it for the wire,
         # exactly as the XSLT path does. The **store** stays stripped: this is a
         # serve-time rebuild, not an ingest change.
-        body = self._metadata_branch(fmt, terms, "local:zetcom($src)", "$src")
+        #
+        # The RIA record is the whole `application` document
+        # (application/modules/module/moduleItem); `moduleItem` is a LOCAL
+        # element, so a payload rooted at it is not the record and does not
+        # resolve in Zetcom's schema. Serve the whole document.
+        if fmt is None or fmt.kind == "passthrough":
+            body = "local:zetcom($src/ancestor::application)"
+        else:
+            body = self._metadata_branch(fmt, terms, "local:zetcom($src)", "$src")
         prefix = _xq_string(module.identifier_prefix)
         return (
             f"for $src in collection({_xq_string(module.database)})"
