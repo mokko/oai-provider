@@ -1,7 +1,9 @@
 # oai-provider
 
-An OAI-PMH data provider backend. MuseumPlus RIA XML goes in, the six OAI
-verbs come out, with BaseX as the store.
+An OAI-PMH data provider backend written in Python. With BaseX as the store,
+generic MuseumPlus RIA XML goes in and the six OAI verbs come out. We are
+providing several on-the-fly metadata formats like Dublin Core and Lido. Work
+in progress. Nothing particularly well tested at this time.
 
 ## Shape
 
