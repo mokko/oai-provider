@@ -210,6 +210,16 @@ xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId=
 term = "dc:identifier"
 xpath = "//dataField[@name='ObjObjectNumberTxt']/value"
 
+# The holding institution ("Verwaltende Institution"). Dublin Core has no
+# institution element; dc:publisher - "an entity responsible for making the
+# resource available" - is the slot harvesters (Europeana, the DDB) read as the
+# data provider. Taken from the record's own owner reference (1000/1000,
+# single-valued) rather than a constant, so it stays right if more than one
+# collection is ever ingested.
+[[modules.terms]]
+term = "dc:publisher"
+xpath = "//moduleReference[@name='ObjOwnerRef']//formattedValue"
+
 # the main person association, as the museum's own display form ("Opel, Peter")
 [[modules.terms]]
 term = "dc:creator"
@@ -269,6 +279,14 @@ xpath = "//dataField[@name='PerNotesClb']/value"
 [[modules.terms]]
 term = "dc:source"
 xpath = "//dataField[@name='PerSourceClb']/value"
+
+# The institution, as for Object - but a Person record carries no owner
+# reference of its own, so this is a deployment constant, not data. See the note
+# in AGENTS.md: it is the one value here that is an assumption about the
+# deployment rather than something the record states.
+[[modules.terms]]
+term = "dc:publisher"
+literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
 
 [[modules.terms]]
 term = "dc:language"
@@ -332,6 +350,13 @@ xpath = "//dataField[@name='MulPhotocreditTxt']/value"
 [[modules.terms]]
 term = "dc:relation"
 xpath = "//dataField[@name='MulIPTCObjRefTxt']/value"
+
+# The institution, as a constant: an asset points at its object through
+# MulObjectRef, but a term's xpath sees only its own record, so the owning
+# collection cannot be joined in here.
+[[modules.terms]]
+term = "dc:publisher"
+literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
 
 [[modules.terms]]
 term = "dc:language"

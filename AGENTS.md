@@ -385,6 +385,18 @@ the export date, which changes on every export.
 - **RIA XML is not flat.** Most fields sit inside
   `repeatableGroup/repeatableGroupItem` at varying depth, so mapping XPaths
   must descend rather than follow fixed paths.
+- **The holding institution is `dc:publisher`, and it is the one mapped value
+  that is partly an assumption.** Dublin Core has no institution element, and
+  `oai_dc.xsd` permits only the fifteen `dc` elements as children — of those,
+  `dc:publisher` ("an entity responsible for making the resource available") is
+  what harvesters such as Europeana and the DDB read as the data provider.
+  `dc:contributor`, `dc:source` and `dc:rights` are the plausible neighbours and
+  each means something else. For **Object** the value is real data
+  (`ObjOwnerRef//formattedValue`, present on 1000/1000). For **Person** and
+  **Multimedia** the record states no owning collection, and a term's XPath sees
+  only its own record (so `MulObjectRef` cannot be joined in), so the
+  institution is a **literal** — correct for a one-collection deployment and
+  wrong the moment a second collection is ingested.
 - **External variables arrive as untyped strings unless the query declares the
   type.** `declare variable $limit as xs:integer external;` — `$limit + 1` on a
   bound `1` otherwise fails with "Arithmetics not defined for xs:string and
