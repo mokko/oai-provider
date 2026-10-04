@@ -234,6 +234,15 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
             <formattedValue language="de">cm</formattedValue>
           </vocabularyReferenceItem>
         </vocabularyReference>
+        <repeatableGroup name="ObjSystematicGrp" size="1">
+          <repeatableGroupItem id="7005">
+            <vocabularyReference name="SystematicVoc" id="60040" instanceName="SystematicVgr">
+              <vocabularyReferenceItem id="1610400" name="Zeichnung">
+                <formattedValue language="de">Zeichnung</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </repeatableGroupItem>
+        </repeatableGroup>
         <moduleReference name="ObjObjectGroupsRef">
           <moduleReferenceItem moduleItemId="6054"/>
         </moduleReference>
@@ -377,6 +386,22 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     z = "{http://www.zetcom.com/ria/ws/module}"
     name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
     assert name is not None and name.text == "Doe, Jane"
+
+
+def test_the_systematic_classification_is_a_subject(module_config: Config) -> None:
+    """dc:subject carries the museum's systematic classification out of
+    ObjSystematicGrp. `SystematicVoc` exists nowhere else in the real data — 0
+    top-level elements — so the path has to go through the group item."""
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:EM-object-1001"),
+        ("metadataPrefix", "oai_dc"),
+    )
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
+    assert md is not None, "no metadata served"
+    subjects = [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "subject"]
+    assert "Zeichnung" in subjects, subjects
 
 
 def test_dimensions_are_served_with_their_unit(module_config: Config) -> None:

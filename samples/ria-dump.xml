@@ -104,6 +104,15 @@
             <formattedValue language="de">cm</formattedValue>
           </vocabularyReferenceItem>
         </vocabularyReference>
+        <repeatableGroup name="ObjSystematicGrp" size="1">
+          <repeatableGroupItem id="7005">
+            <vocabularyReference name="SystematicVoc" id="60040" instanceName="SystematicVgr">
+              <vocabularyReferenceItem id="1610400" name="Zeichnung">
+                <formattedValue language="de">Zeichnung</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </repeatableGroupItem>
+        </repeatableGroup>
         <moduleReference name="ObjOwnerRef" targetModule="Address" multiplicity="N:1" size="1">
           <moduleReferenceItem moduleItemId="112264">
             <formattedValue language="de">Kupferstichkabinett, Staatliche Museen zu Berlin</formattedValue>

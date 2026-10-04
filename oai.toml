@@ -194,6 +194,20 @@ module = "Object"
 term = "dc:subject"
 xpath = "//vocabularyReference[@name='ObjCategoryVoc']//formattedValue"
 
+# The museum's own systematic classification — "Zeichnung" 670, "Druckgraphik"
+# 238, "Malerei" 89 — from ObjSystematicGrp. 1000/1000 objects, 1007 values (993
+# with one, 7 with two).
+#
+# `SystematicVoc` occurs **only** inside that group: 0 top-level elements in the
+# real data, so there is nothing to deduplicate, and the path has to go through
+# the group item. It is a facet of its own — the kind of object — rather than a
+# repeat of ObjOrgGroupVoc (which collection) or MaterialVoc (what of), so it is
+# added to the subjects rather than replacing one.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:subject"
+xpath = "//repeatableGroup[@name='ObjSystematicGrp']/repeatableGroupItem/vocabularyReference[@name='SystematicVoc']//formattedValue"
+
 # The collection is German; this is a declared constant, not a field.
 [[metadata.formats.terms]]
 module = "Object"
