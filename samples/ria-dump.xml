@@ -60,6 +60,9 @@
         <virtualField name="ObjPerAssociationMainParticipantNameVrt">
           <value>Unbekannt</value>
         </virtualField>
+        <virtualField name="ObjGeograficVrt">
+          <value>Nürnberg</value>
+        </virtualField>
         <vocabularyReference name="ObjOrgGroupVoc" id="61643" instanceName="ObjOrgGroupVgr">
           <vocabularyReferenceItem id="1632860" name="Musikinstrumente">
             <formattedValue language="de">Musikinstrumente</formattedValue>

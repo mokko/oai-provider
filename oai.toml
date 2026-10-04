@@ -208,6 +208,26 @@ module = "Object"
 term = "dc:subject"
 xpath = "//repeatableGroup[@name='ObjSystematicGrp']/repeatableGroupItem/vocabularyReference[@name='SystematicVoc']//formattedValue"
 
+# Where. Dublin Core's `dc:coverage` is the spatial element ("the spatial or
+# temporal topic of the resource … or the jurisdiction under which the resource
+# is relevant"); qualified DC would say `dcterms:spatial`, which oai_dc does not
+# allow.
+#
+# `ObjGeograficVrt` is the museum's own composed display form — "Nürnberg",
+# "Nürnberg; Nürnberg / Augsburg" for a record with two places — present on 165
+# of the 1000 objects. The group behind it is richer but noisier: its `PlaceVoc`
+# is the place name, while `GeopolVoc` is the *kind* of place ("Stadt",
+# "Region", "Papiermühle") and `TypeVoc` the role ("Herstellungsort",
+# "Entstehungsort stilistisch", "dargestellter Ort"). Do not map those two as
+# coverage: a harvester would be told the place is "Stadt".
+#
+# 835 objects have no place at all and get no dc:coverage, rather than an empty
+# one. `ObjAssociatedPlaceVrt` exists in the schema and is empty on all 1000.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:coverage"
+xpath = "//virtualField[@name='ObjGeograficVrt']/value"
+
 # The collection is German; this is a declared constant, not a field.
 [[metadata.formats.terms]]
 module = "Object"
@@ -269,6 +289,17 @@ xpath = "//dataField[@name='PerSourceClb']/value"
 module = "Person"
 term = "dc:publisher"
 literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
+
+# Where the person belongs to. Same element as for Object, `dc:coverage`, but a
+# different source: a Person carries no `...Vrt` for this, so it comes out of
+# `PerGeograficGrp` — present on 448 of the 652 persons (69%, better than the
+# objects' 17%). `PlaceNameVoc` is the place name ("Berlin", "England"); the
+# sibling `GeograficVoc` is the *kind* ("Stadt", "Insel", "Land") and must not be
+# mapped as coverage.
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:coverage"
+xpath = "//repeatableGroup[@name='PerGeograficGrp']//vocabularyReference[@name='PlaceNameVoc']//formattedValue"
 
 [[metadata.formats.terms]]
 module = "Person"

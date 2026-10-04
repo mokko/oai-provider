@@ -216,6 +216,9 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1001</value>
         </dataField>
+        <virtualField name="ObjGeograficVrt">
+          <value>Nürnberg</value>
+        </virtualField>
         <repeatableGroup name="ObjDimAllGrp" size="1">
           <repeatableGroupItem id="7004">
             <dataField dataType="Long" name="SortLnu">
@@ -264,6 +267,20 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
         <dataField dataType="Varchar" name="PerNameTxt">
           <value>Doe, Jane</value>
         </dataField>
+        <repeatableGroup name="PerGeograficGrp" size="1">
+          <repeatableGroupItem id="9003">
+            <vocabularyReference name="PlaceNameVoc" id="60050" instanceName="PlaceNameVgr">
+              <vocabularyReferenceItem id="1610500" name="Berlin">
+                <formattedValue language="de">Berlin</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+            <vocabularyReference name="GeograficVoc" id="60051" instanceName="GeograficVgr">
+              <vocabularyReferenceItem id="1610501" name="Stadt">
+                <formattedValue language="de">Stadt</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </repeatableGroupItem>
+        </repeatableGroup>
         <repeatableGroup name="PerDateGrp" size="2">
           <repeatableGroupItem id="9001">
             <dataField dataType="Long" name="SortingLnu">
@@ -386,6 +403,30 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     z = "{http://www.zetcom.com/ria/ws/module}"
     name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
     assert name is not None and name.text == "Doe, Jane"
+
+
+def test_place_is_served_as_coverage_but_not_the_kind_of_place(
+    module_config: Config,
+) -> None:
+    """dc:coverage carries the place *name*, never the kind of place. The object
+    takes the museum's display form (ObjGeograficVrt); a person takes
+    PlaceNameVoc out of PerGeograficGrp. Both fixtures carry GeograficVoc /
+    GeopolVoc ("Stadt") alongside, so mapping the kind as coverage would fail
+    here rather than quietly tell a harvester the place is "Stadt"."""
+    for identifier, expected in (
+        ("spk-berlin.de:EM-object-1001", "Nürnberg"),
+        ("spk-berlin.de:EM-person-77", "Berlin"),
+    ):
+        root = _call(
+            module_config,
+            ("verb", "GetRecord"),
+            ("identifier", identifier),
+            ("metadataPrefix", "oai_dc"),
+        )
+        md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
+        assert md is not None, f"no metadata for {identifier}"
+        coverage = [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "coverage"]
+        assert coverage == [expected], (identifier, coverage)
 
 
 def test_the_systematic_classification_is_a_subject(module_config: Config) -> None:
