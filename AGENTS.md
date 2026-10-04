@@ -204,6 +204,9 @@ that is what makes the formats differ:
   strictly as served. (`moduleItem` alone is a **local** element and would not
   resolve — which is why the payload is the whole
   `application/modules/module/moduleItem` tree, not a bare `moduleItem`.)
+  The module's `totalSize` is corrected at serve time to the number of records
+  the document actually holds — one, for the per-record store — not the source
+  file's count the ingest copied; a missing attribute is left missing.
 - **`lido`** — **envelope only; content is not validated.** The vendored schema
   imports `xml.xsd` (2001-era URL) and GML 3.1.1 over plain http, so loading it
   fetches the GML tree — and the type xmlschema chokes on lives in **GML, not in

@@ -517,8 +517,17 @@ def test_list_records_carries_the_module_item_as_metadata(module_config: Config)
     root = _call(module_config, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
     mds = root.findall(f"{q('ListRecords')}/{q('record')}/{q('metadata')}")
     assert len(mds) == 3
-    assert all(
-        list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}application"
-        for md in mds
-    )
+    z = "{http://www.zetcom.com/ria/ws/module}"
+    for md in mds:
+        app = list(md)[0]
+        assert app.tag == f"{z}application"
+        mod = app.find(f"{z}modules/{z}module")
+        assert mod is not None
+        item = mod.find(f"{z}moduleItem")
+        assert item is not None
+        assert item.get("id")
+        # totalSize counts the records in THIS document (the store keeps one
+        # record per document), not the source file's count: the Object module
+        # fixture declares totalSize="2" while each stored document holds one.
+        assert mod.get("totalSize") == "1"
 

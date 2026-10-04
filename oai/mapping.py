@@ -252,8 +252,20 @@ class QueryBuilder:
         # (application/modules/module/moduleItem); `moduleItem` is a LOCAL
         # element, so a payload rooted at it is not the record and does not
         # resolve in Zetcom's schema. Serve the whole document.
+        #
+        # `totalSize` is corrected to the number of records this document
+        # actually holds - the store keeps ONE record per document, so that is
+        # 1, not the source file's count the ingest copied. Left absent if the
+        # store does not carry the attribute (absent is honest; wrong is not).
         if fmt is None or fmt.kind == "passthrough":
-            body = "local:zetcom($src/ancestor::application)"
+            body = (
+                "local:zetcom("
+                "copy $app := $src/ancestor::application "
+                "modify (for $m in $app/modules/module return "
+                "if ($m/@totalSize) then replace value of node $m/@totalSize "
+                "with string(count($app//moduleItem)) else ()) "
+                "return $app)"
+            )
         else:
             body = self._metadata_branch(fmt, terms, "local:zetcom($src)", "$src")
         prefix = _xq_string(module.identifier_prefix)
