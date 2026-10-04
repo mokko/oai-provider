@@ -14,6 +14,8 @@ import pytest
 from oai.config import Config
 from oai.mapping import QueryBuilder
 from oai.protocol import (
+    MAX_ARG_LEN,
+    MAX_TOKEN_LEN,
     Provider,
     ProtocolError,
     TokenState,
@@ -348,3 +350,26 @@ def test_configured_prefix_resolves(config: Config) -> None:
     assert provider.format_for("ria").namespace == (
         "http://www.zetcom.com/ria/ws/module"
     )
+
+
+# -- request-argument size bounds ------------------------------------------
+
+
+def test_an_over_long_argument_is_bad_argument() -> None:
+    with pytest.raises(ProtocolError) as err:
+        parse_args(
+            [
+                ("verb", "GetRecord"),
+                ("identifier", "x" * (MAX_ARG_LEN + 1)),
+                ("metadataPrefix", "ria"),
+            ]
+        )
+    assert err.value.code == "badArgument"
+
+
+def test_an_over_long_token_is_bad_resumption_token() -> None:
+    """A token is capped separately, so an abusive one is a token error rather
+    than a plain badArgument - and it is rejected before any base64/HMAC work."""
+    with pytest.raises(ProtocolError) as err:
+        decode_token("x" * (MAX_TOKEN_LEN + 1), SECRET, "fp", 0)
+    assert err.value.code == "badResumptionToken"

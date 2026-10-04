@@ -91,6 +91,14 @@ TS_SECONDS = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
 # the response well-formed.
 _XML_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
 
+# Bounds on request arguments. No identifier, setSpec or metadataPrefix here is
+# anywhere near this long, so a longer value cannot be meaningful - and binding
+# an unbounded string to BaseX (or base64-decoding one) is work a client should
+# not be able to force. The token cap is separate so an over-long token is a
+# badResumptionToken, not a badArgument.
+MAX_ARG_LEN = 512
+MAX_TOKEN_LEN = 4096
+
 
 def q(name: str) -> str:
     return f"{{{OAI_NS}}}{name}"
@@ -210,6 +218,11 @@ def parse_args(pairs: list[tuple[str, str]]) -> Request:
             raise ProtocolError(
                 "badArgument", f"repeated argument: {key}"
             )
+        if key != "resumptionToken" and len(value) > MAX_ARG_LEN:
+            raise ProtocolError(
+                "badArgument",
+                f"{key} is too long (max {MAX_ARG_LEN} characters)",
+            )
         seen[key] = value
 
     verb = seen.pop("verb", None)
@@ -313,6 +326,8 @@ def decode_token(token: str, secret: str, fingerprint: str, ttl: int) -> TokenSt
     a truncated token, a tampered payload, a token from a different mapping,
     or one that has expired.
     """
+    if len(token) > MAX_TOKEN_LEN:
+        raise TokenError(f"token is longer than {MAX_TOKEN_LEN} characters")
     try:
         if secret:
             body_b64, _, sig_b64 = token.partition(".")
