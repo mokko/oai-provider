@@ -34,7 +34,8 @@ def config() -> Config:
 
 
 def fp() -> str:
-    return QueryBuilder(Config.load(ROOT / "oai.toml").mapping).fingerprint()
+    cfg = Config.load(ROOT / "oai.toml")
+    return QueryBuilder(cfg.modules, cfg.timezone_offset).fingerprint()
 
 
 # -- arguments --------------------------------------------------------------
@@ -286,12 +287,15 @@ def test_cursor_carries_a_total_order_key() -> None:
     assert back.last_datestamp and back.last_identifier
 
 
-def test_fingerprint_changes_when_the_mapping_changes(config: Config) -> None:
+def test_fingerprint_changes_when_a_module_changes(config: Config) -> None:
     import dataclasses
 
-    before = QueryBuilder(config.mapping).fingerprint()
-    changed = dataclasses.replace(config.mapping, identifier="@uuid")
-    assert QueryBuilder(changed).fingerprint() != before
+    before = QueryBuilder(config.modules, config.timezone_offset).fingerprint()
+    changed = dataclasses.replace(config.modules[0], identifier="@uuid")
+    after = QueryBuilder(
+        (changed,) + config.modules[1:], config.timezone_offset
+    ).fingerprint()
+    assert after != before
 
 
 # -- metadata formats -------------------------------------------------------

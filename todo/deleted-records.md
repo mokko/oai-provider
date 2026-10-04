@@ -30,19 +30,18 @@ returns that header with status deleted. `persistent` means the tombstone stays 
   `Kriegsverlust`, `deakzessioniert (Abgabe)`, `Abgabe innerhalb der SPK` (plus `vorhanden`). If
   those mean "no longer held", a mapped predicate could serve a tombstone without any
   absence-tracking at all. That is a *question for the registrars / the colleague*, not a design.
-- **Absence in a full dump** is the other signal, and only works if the dump is complete and its
-  chunks share **one** dump id with reconcile run **once after the last chunk**. Reconcile per chunk
-  tombstones everything not in that chunk — the enveloped path's own landmine, already documented in
-  `AGENTS.md`.
+- **Absence in a full dump** is the other signal, and only works if the dump is complete: a diff run
+  per chunk would call every record absent from *that* chunk deleted, so the chunks must be compared
+  as one set, not one file at a time.
 
 ## Sketches (not plans)
 
 1. **Source-signalled** — a per-record predicate (publication status, or a future field) marks a
    record withdrawn; serve `status="deleted"`. Cheapest *if* the data means it.
 2. **Absence-diff** — snapshot the identifier set before replacing it, diff against the new one,
-   tombstone the missing. Needs the complete-dump guarantee and the shared dump-set id above.
-   (The **enveloped** path already does this: reconcile + a content-hash dump id. It is not the
-   deployment path.)
+   tombstone the missing. Needs the complete-dump guarantee above. (The repository used to carry
+   exactly this, in a second storage mode that has since been removed — `git log` has it if it is
+   ever wanted back.)
 3. **Stay `"no"`** — the source owns liveness; a harvester learns of a withdrawal only by
    re-harvesting. Honest today, and the current default.
 

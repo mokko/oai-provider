@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
 
 from .basex import BaseXClient
-from .config import ENVELOPE_NS, Config
+from .config import Config
 from .mapping import QueryBuilder
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
@@ -430,29 +430,25 @@ class Provider:
     def __init__(self, config: Config, client: BaseXClient) -> None:
         self.config = config
         self.client = client
-        self.builder = QueryBuilder(config.mapping, config.modules)
+        self.builder = QueryBuilder(config.modules, config.timezone_offset)
         self.granularity = config.identity.granularity
-        # Sets come from the sources that are actually served: the modules'
-        # own allow-lists in module mode, the single enveloped mapping
-        # otherwise. Deduplicated by spec, because the same set can be
-        # declared by more than one module.
+        # Sets come from the modules' own allow-lists. Deduplicated by spec,
+        # because the same set can be declared by more than one module.
         rules: list = []
-        if config.modules:
-            seen: set[str] = set()
-            for module in config.modules:
-                for rule in module.sets:
-                    if rule.spec not in seen:
-                        seen.add(rule.spec)
-                        rules.append(rule)
-        else:
-            rules = list(config.mapping.sets)
+        seen: set[str] = set()
+        for module in config.modules:
+            for rule in module.sets:
+                if rule.spec not in seen:
+                    seen.add(rule.spec)
+                    rules.append(rule)
         self.set_rules = tuple(rules)
-        # Bound into every query that renders a source: the envelope database
-        # (unused in module mode, harmless) and the offset a local wall clock
-        # is shifted by.
+        # Bound into every query that renders a source. The templates still
+        # declare $db external (module mode's collection() calls name their
+        # databases literally), and an unbound external variable is an error,
+        # so it is passed empty. $tzOffset shifts a local wall clock to UTC.
         self.source_vars = {
-            "db": config.basex.database,
-            "tzOffset": config.mapping.timezone_offset,
+            "db": "",
+            "tzOffset": config.timezone_offset,
         }
 
     # -- helpers ---------------------------------------------------------
@@ -596,7 +592,6 @@ class Provider:
     async def _list(self, request: Request, verb: str) -> ET.Element:
         """Shared implementation of ListIdentifiers and ListRecords."""
         with_payload = verb == "ListRecords"
-        db = self.config.basex.database
         total = 0
 
         if request.token:

@@ -11,8 +11,8 @@ hermes-agent and deepseek-v4.1 flash.
 - **Generic XML in.** The provider never assumes a schema — which XPaths pull
   `identifier` / `datestamp` / `sets` out of a record is configuration
   (`oai.toml`).
-- **One document per record in BaseX**, wrapped in an envelope; the source
-  element is kept whole inside it.
+- **One document per record in BaseX**, under the wrapper the module layout
+  expects; the source element is kept whole inside it.
 - **Namespaces are stripped on the way in, restored on demand.** Module mode
   stores every record with its namespaces removed (`local:strip`), which is
   what matches the colleague's `sync_*` layout and conflates the RIA dialects.
@@ -67,7 +67,7 @@ curl 'http://localhost:8000/oai?verb=Identify'
 
 ## Configuration
 
-`oai.toml` holds the identity, the XPath mapping, the set allow-list, the
+`oai.toml` holds the identity, the datestamp offset, the set allow-lists, the
 metadata formats, and one `[[modules]]` block per MuseumPlus module. Each field
 carries a comment saying why it is what it is. A trimmed example:
 
@@ -81,18 +81,8 @@ deletedRecord = "no"                    # module mode cannot serve deletions
 url = "http://localhost:8080/rest"
 user = "oai"                            # password from OAI_BASEX_PASSWORD
 
-[mapping]
-namespaces = { m = "http://www.zetcom.com/ria/ws/module" }
-records = "/m:application/m:modules/m:module[@name='Object']/m:moduleItem"
-identifier = "@id"
-datestamp = "m:systemField[@name='__lastModified']/m:value"
+[datestamps]
 timezoneOffset = "+02:00"               # source is local wall clock -> UTC
-
-# sets are an explicit allow-list; the setSpec is chosen by hand
-[[mapping.sets]]
-spec = "mimo"
-label = "Musikinstrumente"
-xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
 
 [protocol]
 pageSize = 100
@@ -104,11 +94,17 @@ prefix = "ria"
 namespace = "http://www.zetcom.com/ria/ws/module"
 kind = "passthrough"
 
-# module mode: one database per module, where the Dublin Core terms live
+# module mode: one database per module; sets and DC terms belong to a module
 [[modules]]
 name = "Object"
 database = "sync_Object"
 identifierPrefix = "spk-berlin.de:object-"
+
+# sets are an explicit allow-list; the setSpec is chosen by hand
+[[modules.sets]]
+spec = "KK"
+label = "Kupferstichkabinett, Staatliche Museen zu Berlin"
+xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId='112264']"
 
 [[modules.terms]]
 term = "dc:type"

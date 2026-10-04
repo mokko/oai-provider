@@ -15,8 +15,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from .config import ENVELOPE_PREFIX, Mapping
-
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "xq"
 
 # The MuseumPlus/RIA namespace. Module mode stores records WITHOUT namespaces,
@@ -87,26 +85,13 @@ def _xq_text(value: str) -> str:
 class QueryBuilder:
     def __init__(
         self,
-        mapping: Mapping,
         modules: tuple = (),
+        timezone_offset: str = "+00:00",
         template_dir: Path = TEMPLATE_DIR,
     ):
-        self.mapping = mapping
         self.modules = tuple(modules)
+        self.timezone_offset = timezone_offset
         self.template_dir = Path(template_dir)
-
-    # -- the source of rows ----------------------------------------------
-
-    def uses_modules(self) -> bool:
-        """Whether this mapping reads the per-module databases.
-
-        With [[modules]] configured the provider serves the module databases
-        (the colleague's `sync_*` layout); without them it serves the single
-        enveloped database. The two are normalized to the same row shape here,
-        so nothing downstream - paging, the cursor, the token - has to know
-        which one it is talking to.
-        """
-        return bool(self.modules)
 
     def modules_for(self, fmt=None) -> tuple:
         """The modules a request actually spans.
@@ -139,12 +124,10 @@ class QueryBuilder:
         record templates be identical for both storage modes.
         """
         modules = self.modules_for(fmt)
-        if modules:
-            return self._module_source(modules)
-        if self.modules:
+        if not modules:
             # the format restricts to a module set that produces nothing
             return "()"
-        return self._envelope_source()
+        return self._module_source(modules)
 
     # -- the payload, fetched for the page and nothing else ---------------
 
@@ -156,26 +139,8 @@ class QueryBuilder:
         format (oai_dc) is built here rather than in the source, so it too is
         assembled only for what is served.
         """
-        if self.modules:
-            blocks = ",\n".join(self._module_payload(m, fmt) for m in self.modules)
-            return f"(\n{blocks}\n)"
-        return self._envelope_payload(fmt)
-
-    def _envelope_payload(self, fmt=None) -> str:
-        env = ENVELOPE_PREFIX
-        # In the enveloped store the record is INSIDE env:source, so terms are
-        # relative to that element, not to the envelope itself.
-        base = f"$d/{env}:source"
-        body = self._metadata_branch(
-            fmt, fmt.terms if fmt else (), f"{base}/node()", base
-        )
-        return (
-            f"for $d in collection($db)/{env}:record\n"
-            f"let $id := string($d/@{env}:identifier)\n"
-            f"where $id = $wanted/@identifier\n"
-            f"  and string($d/@{env}:status) ne 'deleted'\n"
-            f'return <p id="{{$id}}">{{ {body} }}</p>'
-        )
+        blocks = ",\n".join(self._module_payload(m, fmt) for m in self.modules)
+        return f"(\n{blocks}\n)"
 
     def _module_payload(self, module, fmt=None) -> str:
         if fmt is not None and fmt.kind == "xslt":
@@ -349,17 +314,6 @@ class QueryBuilder:
             for p, uri in sorted(fmt.namespaces.items())
         )
 
-    def _envelope_source(self) -> str:
-        env = ENVELOPE_PREFIX
-        return (
-            f"for $r in collection($db)/{env}:record\n"
-            "return\n"
-            f'  <row datestamp="{{$r/@{env}:datestamp}}"\n'
-            f'       identifier="{{$r/@{env}:identifier}}"\n'
-            f'       status="{{string($r/@{env}:status)}}"\n'
-            f'       sets="{{string-join($r/{env}:set, \' \')}}"/>'
-        )
-
     def _module_source(self, modules) -> str:
         blocks = ",\n".join(self._module_block(m) for m in modules)
         return f"(\n{blocks}\n)"
@@ -406,36 +360,20 @@ class QueryBuilder:
         ]
         return ",\n    ".join(parts)
 
-    def set_expressions(self) -> str:
-        """Set membership for the enveloped mapping (rooted at $r)."""
-        return self._set_expressions(self.mapping.sets)
-
-    def identifier_expr(self) -> str:
-        return f"string({self.mapping.resolve(self.mapping.identifier)})"
-
-    def datestamp_expr(self) -> str:
-        return self.mapping.resolve(self.mapping.datestamp)
-
-    def record_expr(self) -> str:
-        return self.mapping.resolve(self.mapping.records)
-
     # -- rendering --------------------------------------------------------
 
     def render(self, template: str, fmt=None, **extra: str) -> str:
         text = (self.template_dir / template).read_text(encoding="utf-8")
         subs = {
-            "NAMESPACES": self.mapping.namespace_declarations(),
+            # Module mode stores namespace-stripped records, so a generated
+            # query declares no prefixes of its own - the placeholder is empty.
+            "NAMESPACES": "",
             "FORMAT_NAMESPACES": self.format_namespace_declarations(fmt),
-            "ENVELOPE_PREFIX": ENVELOPE_PREFIX,
             "OAI_DATE_FUNCTION": OAI_DATE_FUNCTION,
-            "RECORD_XPATH": self.record_expr(),
-            "IDENTIFIER_EXPR": self.identifier_expr(),
-            "DATESTAMP_EXPR": self.datestamp_expr(),
-            "SET_EXPRESSIONS": self.set_expressions(),
             "SOURCE": self.source_expr(fmt),
             "PAYLOADS": self.payload_expr(fmt),
             "ZETCOM_FUNCTION": ZETCOM_FUNCTION,
-            "TZOFFSET": self.mapping.timezone_offset,
+            "TZOFFSET": self.timezone_offset,
             **extra,
         }
         for key, value in subs.items():
@@ -444,18 +382,6 @@ class QueryBuilder:
             leftover = text[text.index("{{") : text.index("{{") + 40]
             raise ValueError(f"unsubstituted placeholder near: {leftover!r}")
         return text
-
-    def ingest_query(self) -> str:
-        return self.render("ingest.xq.tmpl")
-
-    def validate_query(self) -> str:
-        return self.render("validate.xq.tmpl")
-
-    def reconcile_query(self) -> str:
-        return self.render("reconcile.xq.tmpl")
-
-    def stale_query(self) -> str:
-        return self.render("stale.xq.tmpl")
 
     def page_query(self, fmt=None) -> str:
         return self.render("page.xq.tmpl", fmt=fmt)
@@ -478,13 +404,16 @@ class QueryBuilder:
         Changing this is exactly the case the token fingerprint exists to
         catch: the same request arguments stop meaning the same result set.
         """
-        parts = [
-            self.mapping.records,
-            self.mapping.identifier,
-            self.mapping.identifier_prefix,
-            self.mapping.datestamp,
-            self.mapping.timezone_offset,
-            ",".join(f"{p}={u}" for p, u in sorted(self.mapping.namespaces.items())),
-            ";".join(f"{r.spec}|{r.xpath}" for r in self.mapping.sets),
-        ]
+        parts = [self.timezone_offset]
+        for module in self.modules:
+            parts += [
+                module.name,
+                module.database,
+                module.identifier_prefix,
+                module.records_xpath(),
+                module.identifier,
+                module.datestamp,
+            ]
+            parts += [f"{r.spec}|{r.xpath}" for r in module.sets]
+            parts += [f"{t.term}|{t.xpath}|{t.literal}" for t in module.terms]
         return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]

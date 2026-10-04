@@ -17,7 +17,7 @@ from starlette.testclient import TestClient
 from oai.app import app as app_factory
 from oai.app import create_app
 from oai.basex import BaseXClient
-from oai.config import Config
+from oai.config import Config, ModuleConfig, SetRule
 from oai.mapping import QueryBuilder
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,14 +27,22 @@ TEST_DB = "oai_provider_http"
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
-    # the enveloped path (see test_verbs_basex): [[modules]] cleared, and the
-    # persistent policy it reconciles under pinned back on, on purpose
-    return dataclasses.replace(
-        cfg,
-        basex=dataclasses.replace(cfg.basex, database=TEST_DB),
-        modules=(),
-        identity=dataclasses.replace(cfg.identity, deleted_record="persistent"),
+    # One Object module over the sample, in a scratch database. The sample is
+    # Object-only, and its group ids stay as sets so `set=mimo` is exercised.
+    obj = ModuleConfig(
+        name="Object",
+        database=TEST_DB,
+        identifier_prefix="spk-berlin.de:object-",
+        sets=(
+            SetRule(
+                spec="mimo",
+                label="Musikinstrumente",
+                xpath="moduleReference[@name='ObjObjectGroupsRef']"
+                "/moduleReferenceItem[@moduleItemId='6054']",
+            ),
+        ),
     )
+    return dataclasses.replace(cfg, modules=(obj,))
 
 
 @pytest.fixture(scope="module")
@@ -64,24 +72,21 @@ def client(cfg: Config):
 
 @pytest.fixture(scope="module", autouse=True)
 def seeded(cfg: Config) -> None:
-    variables = {
-        "path": str(SAMPLE),
-        "db": cfg.basex.database,
-        "idPrefix": cfg.mapping.identifier_prefix,
-        "tzOffset": cfg.mapping.timezone_offset,
-        "dumpId": "http-dump",
-        "now": "2026-09-29T12:00:00Z",
-        "policy": cfg.identity.deleted_record,
-    }
-
     async def go() -> None:
-        builder = QueryBuilder(cfg.mapping)
+        builder = QueryBuilder(cfg.modules, cfg.timezone_offset)
         async with BaseXClient(
             cfg.basex.url, cfg.basex.user, cfg.basex.password
         ) as bx:
-            await bx.command(f"DROP DB {cfg.basex.database}")
-            await bx.command(f"CREATE DB {cfg.basex.database}")
-            await bx.query(builder.ingest_query(), **variables)
+            for module in cfg.modules:
+                if await bx.database_exists(module.database):
+                    await bx.drop_database(module.database)
+                await bx.create_database(module.database)
+                await bx.query(
+                    builder.module_ingest_query(),
+                    path=str(SAMPLE),
+                    db=module.database,
+                    moduleName=module.name,
+                )
 
     asyncio.run(go())
 
@@ -111,7 +116,7 @@ def test_get_and_post_are_equivalent(client) -> None:
         return re.sub(r"<[^>]*responseDate>[^<]*<", "<responseDate/>", body)
 
     assert strip_timestamp(get.text) == strip_timestamp(post.text)
-    assert "spk-berlin.de:EM-objId-1001" in get.text
+    assert "spk-berlin.de:object-1001" in get.text
 
 
 def test_post_with_a_duplicate_argument_is_rejected(client) -> None:

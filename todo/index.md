@@ -50,9 +50,9 @@ At ingest, write `oai:datestamp` (normalized UTC), `oai:identifier`, and
 `oai:sets` as attributes on the wrapper `module` element the ingest already
 synthesizes (the record payload underneath stays untouched, so the colleague's
 path still reads identically). A `reindex` query backfills existing databases,
-so this is adoptable without a full re-ingest. This is exactly the shape the
-*enveloped* path already uses — module mode dropped it to mirror the raw
-`sync_*` layout, and that is what costs at scale.
+so this is adoptable without a full re-ingest. The alternative at ingest time is
+to keep the wrapper minimal (raw `sync_*` layout), and that is what costs at
+scale.
 
 **Step 1 — `CREATE INDEX` on `oai:datestamp` (and the set value).**
 Then `from`/`until`/set stop scanning and become index lookups — which *is* the

@@ -19,14 +19,12 @@ granularity = "YYYY-MM-DDThh:mm:ssZ"
 # tombstone can be served. "no" says exactly that - the source owns liveness,
 # and a harvester must re-harvest to learn of a withdrawal. Claiming
 # "persistent" while serving no deletions is the one thing a harvester can
-# never detect. (The enveloped ingest *can* reconcile, but it is not the
-# deployment path; see AGENTS.md, "Module mode".)
+# never detect. See AGENTS.md, "Deletions".
 deletedRecord = "no"
-description = "Zetcom MuseumPlus RIA XML, enveloped per moduleItem."
+description = "Zetcom MuseumPlus RIA XML, one record per moduleItem."
 
 [basex]
 url = "http://localhost:8080/rest"
-database = "riadb"
 user = "oai"
 # DEV PLACEHOLDER. Prefer the OAI_BASEX_PASSWORD environment variable; this
 # key exists only so the repo is runnable out of the box. Move it before
@@ -34,56 +32,12 @@ user = "oai"
 password = "devpass"
 timeout = 120
 
-[mapping]
-namespaces = { m = "http://www.zetcom.com/ria/ws/module" }
-
-records = "/m:application/m:modules/m:module[@name='Object']/m:moduleItem"
-
-# uuid is broken in our MuseumPlus instance, so the integer @id is the key.
-# It is also what the old MPX provider used (objId).
-identifier = "@id"
-identifierPrefix = "spk-berlin.de:EM-objId-"
-
-# This is the **enveloped** path's prefix. Module mode (the deployment path)
-# takes its prefix from each [[modules]] entry instead - the Object one is
-# "spk-berlin.de:object-" and deliberately dropped the "EM-". The two are
-# distinct on purpose: the enveloped path keys on the envelope's own @id (what
-# the old MPX provider called objId), while module mode keys on each module's
-# __id. Renaming this string re-identifies every record this path has already
-# served, so it is not a free cleanup.
-
-# __lastModified is the record's own modification time - the thing MPX never
-# had, and the reason the old provider fell back to the export date.
-datestamp = "m:systemField[@name='__lastModified']/m:value"
-
-# Source timestamps are local wall clock, space-separated, no zone.
-# They must be shifted to UTC, not merely labelled "Z".
+[datestamps]
+# Source timestamps are local wall clock, space-separated, no zone
+# ("2021-09-07 10:56:34.615"). They must be shifted to UTC, not merely labelled
+# "Z", or incremental harvesting is silently wrong by the offset. Module mode
+# reads each record's own __lastModified (see [[modules]]).
 timezoneOffset = "+02:00"
-
-# Sets are an explicit allow-list: only what is named here is exposed, and
-# the setSpec is a label we choose - never a value taken out of a record.
-# A record is in the set when its XPath selects anything. Internal group ids
-# and organisational units therefore cannot reach OAI output by accident,
-# and an internal group that is not listed is not harvestable at all.
-#
-# These entries are the **enveloped** path's sets and are what the enveloped
-# tests exercise; module mode (the deployment path) takes its sets from
-# [[modules.sets]] instead. __orgUnit is an organisational unit, not a set, and
-# must not be published as one. The group ids below are from the synthetic
-# sample file.
-
-[[mapping.sets]]
-spec = "mimo"
-label = "Musikinstrumente"
-xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
-
-[[mapping.sets]]
-spec = "78"
-label = "Schellackplatten"
-xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='78']"
-
-# Value tests belong inside the XPath, e.g.:
-#   xpath = "m:dataField[@name='ObjekttypTxt'][m:value='Musikinstrument']"
 
 [protocol]
 pageSize = 100
@@ -197,8 +151,7 @@ name = "Object"
 database = "sync_Object"
 identifierPrefix = "spk-berlin.de:object-"
 
-# Sets for this module (module mode reads [[modules.sets]]; the [[mapping.sets]]
-# above applies only to the enveloped path). "KK" is our internal label for the
+# Sets for this module. "KK" is our internal label for the
 # Kupferstichkabinett: the holder is the Address moduleItem the real data carries
 # (1000/1000 objects in this chunk). The label is our own text, never lifted.
 [[modules.sets]]

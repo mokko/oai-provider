@@ -10,32 +10,43 @@ from pathlib import Path
 import pytest
 
 from oai.basex import BaseXClient
-from oai.config import ENVELOPE_NS, Config
+from oai.config import Config, ModuleConfig, SetRule
 from oai.mapping import QueryBuilder
 from oai.protocol import OAI_NS, Provider, q
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "samples" / "ria-dump.xml"
 TEST_DB = "oai_provider_verbs"
-ENV = f"{{{ENVELOPE_NS}}}"
-
 OAI_ERROR = q("error")
 OAI_HEADER = q("header")
 
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
-    # These tests exercise the **enveloped** path: one database, env:record
-    # documents. The real oai.toml is module mode with deletedRecord="no";
-    # [[modules]] is cleared and the persistent policy pinned back on here on
-    # purpose, because reconcile can tombstone in this mode. The module path
-    # has its own test.
-    return dataclasses.replace(
-        cfg,
-        basex=dataclasses.replace(cfg.basex, database=TEST_DB),
-        modules=(),
-        identity=dataclasses.replace(cfg.identity, deleted_record="persistent"),
+    # One Object module over the sample, in a scratch database. The sample is
+    # Object-only, so this is the same result set the old single-database path
+    # served, and keeping the sample's group ids as sets keeps the set
+    # behaviour testable.
+    obj = ModuleConfig(
+        name="Object",
+        database=TEST_DB,
+        identifier_prefix="spk-berlin.de:object-",
+        sets=(
+            SetRule(
+                spec="mimo",
+                label="Musikinstrumente",
+                xpath="moduleReference[@name='ObjObjectGroupsRef']"
+                "/moduleReferenceItem[@moduleItemId='6054']",
+            ),
+            SetRule(
+                spec="78",
+                label="Schellackplatten",
+                xpath="moduleReference[@name='ObjObjectGroupsRef']"
+                "/moduleReferenceItem[@moduleItemId='78']",
+            ),
+        ),
     )
+    return dataclasses.replace(cfg, modules=(obj,))
 
 
 def _client(cfg: Config) -> BaseXClient:
@@ -63,34 +74,27 @@ def cfg() -> Config:
     return c
 
 
-def seed(
-    cfg: Config, dump: Path, dump_id: str, reset: bool = True
-) -> None:
-    """Ingest `dump`, then reconcile so deletions happen.
+def seed(cfg: Config, dump: Path, reset: bool = True) -> None:
+    """Ingest `dump` into the module databases.
 
-    `reset=False` for a second dump into the same database, which is what the
-    real ingest does - it is incremental. Dropping the database first would
-    wipe the records the next dump is supposed to find missing, and the
-    tombstone tests would pass against a database that never had them.
+    `reset=False` re-ingests into the same database, which is what the real
+    ingest does: it is incremental and additive, so a record this dump does not
+    mention is left alone.
     """
-    variables = {
-        "path": str(dump),
-        "db": cfg.basex.database,
-        "idPrefix": cfg.mapping.identifier_prefix,
-        "tzOffset": cfg.mapping.timezone_offset,
-        "dumpId": dump_id,
-        "now": "2026-09-29T12:00:00Z",
-        "policy": cfg.identity.deleted_record,
-    }
-
     async def go() -> None:
-        builder = QueryBuilder(cfg.mapping)
+        builder = QueryBuilder(cfg.modules, cfg.timezone_offset)
         async with _client(cfg) as bx:
-            if reset:
-                await bx.command(f"DROP DB {cfg.basex.database}")
-                await bx.command(f"CREATE DB {cfg.basex.database}")
-            await bx.query(builder.ingest_query(), **variables)
-            await bx.query(builder.reconcile_query(), **variables)
+            for module in cfg.modules:
+                if reset and await bx.database_exists(module.database):
+                    await bx.drop_database(module.database)
+                if not await bx.database_exists(module.database):
+                    await bx.create_database(module.database)
+                await bx.query(
+                    builder.module_ingest_query(),
+                    path=str(dump),
+                    db=module.database,
+                    moduleName=module.name,
+                )
 
     asyncio.run(go())
 
@@ -130,7 +134,7 @@ def test_identify(cfg: Config) -> None:
     ident = root.find(q("Identify"))
     assert ident is not None
     assert ident.findtext(q("protocolVersion")) == "2.0"
-    assert ident.findtext(q("deletedRecord")) == "persistent"
+    assert ident.findtext(q("deletedRecord")) == "no"
     assert ident.findtext(q("granularity")) == "YYYY-MM-DDThh:mm:ssZ"
     assert root.findtext(f"{q('request')}") == cfg.identity.base_url
 
@@ -144,7 +148,7 @@ def test_list_metadata_formats(cfg: Config) -> None:
 
 
 def test_list_metadata_formats_unknown_identifier(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg, ("verb", "ListMetadataFormats"), ("identifier", "does-not-exist")
     )
@@ -164,25 +168,27 @@ def test_list_sets_uses_config_labels(cfg: Config) -> None:
 
 
 def test_get_record_returns_header_and_payload(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-objId-1001"),
+        ("identifier", "spk-berlin.de:object-1001"),
         ("metadataPrefix", "ria"),
     )
     hdrs = headers(root)
-    assert hdrs[0]["identifier"] == "spk-berlin.de:EM-objId-1001"
+    assert hdrs[0]["identifier"] == "spk-berlin.de:object-1001"
     assert hdrs[0]["sets"] == ["mimo"]
     md = root.find(f"{q('GetRecord')}/{q('metadata')}")
     assert md is not None
     payload = list(md)[0]
-    assert payload.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
+    # module mode stores records namespace-stripped, so the verbatim payload has
+    # no Zetcom namespace here (the LIDO transform re-adds it via local:zetcom)
+    assert payload.tag == "moduleItem"
     assert payload.get("id") == "1001"
 
 
 def test_get_record_unknown_identifier(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "GetRecord"),
@@ -193,62 +199,21 @@ def test_get_record_unknown_identifier(cfg: Config) -> None:
 
 
 def test_get_record_unsupported_format(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-objId-1001"),
+        ("identifier", "spk-berlin.de:object-1001"),
         ("metadataPrefix", "mods"),
     )
     assert errors(root)[0][0] == "cannotDisseminateFormat"
 
 
-def test_get_record_on_a_deleted_record_has_no_metadata(cfg: Config, tmp_path) -> None:
-    seed(cfg, SAMPLE, "dump-a")
-    seed(cfg, reduced_dump(tmp_path), "dump-b", reset=False)
-    root = call(
-        cfg,
-        ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-objId-1002"),
-        ("metadataPrefix", "ria"),
-    )
-    assert headers(root)[0]["status"] == "deleted"
-    assert root.find(f"{q('GetRecord')}/{q('metadata')}") is None
-
-
-def reduced_dump(tmp_path: Path) -> Path:
-    text = SAMPLE.read_text()
-    partial = re.sub(
-        r"\s*<moduleItem[^>]*id=\"1002\".*?</moduleItem>", "", text, flags=re.S
-    )
-    out = tmp_path / "reduced.xml"
-    out.write_text(partial)
-    return out
-
-
 # -- listing ----------------------------------------------------------------
 
 
-def test_list_identifiers_includes_deleted_with_status(cfg: Config, tmp_path) -> None:
-    seed(cfg, SAMPLE, "dump-a")
-    seed(cfg, reduced_dump(tmp_path), "dump-b", reset=False)
-    root = call(cfg, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
-    by_id = {h["identifier"]: h for h in headers(root)}
-    assert len(by_id) == 3
-    assert by_id["spk-berlin.de:EM-objId-1002"]["status"] == "deleted"
-    assert by_id["spk-berlin.de:EM-objId-1001"]["status"] == ""
-
-
-def test_list_records_omits_metadata_for_deleted(cfg: Config, tmp_path) -> None:
-    seed(cfg, SAMPLE, "dump-a")
-    seed(cfg, reduced_dump(tmp_path), "dump-b", reset=False)
-    root = call(cfg, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
-    assert len(root.findall(f"{q('ListRecords')}/{q('metadata')}")) == 2
-    assert len(headers(root)) == 3
-
-
 def test_list_identifiers_no_records_match(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "ListIdentifiers"),
@@ -259,7 +224,7 @@ def test_list_identifiers_no_records_match(cfg: Config) -> None:
 
 
 def test_unknown_set_is_no_records_match(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "ListIdentifiers"),
@@ -270,7 +235,7 @@ def test_unknown_set_is_no_records_match(cfg: Config) -> None:
 
 
 def test_bad_datestamp_is_bad_argument(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "ListIdentifiers"),
@@ -282,7 +247,7 @@ def test_bad_datestamp_is_bad_argument(cfg: Config) -> None:
 
 def test_day_granularity_until_covers_the_whole_day(cfg: Config) -> None:
     """until=2026-09-19 must include a record at 06:15 on the 19th."""
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg,
         ("verb", "ListIdentifiers"),
@@ -290,7 +255,7 @@ def test_day_granularity_until_covers_the_whole_day(cfg: Config) -> None:
         ("until", "2026-09-19"),
     )
     ids = {h["identifier"] for h in headers(root)}
-    assert "spk-berlin.de:EM-objId-1001" in ids
+    assert "spk-berlin.de:object-1001" in ids
 
 
 def test_bad_verb_and_token_exclusivity(cfg: Config) -> None:
@@ -303,7 +268,7 @@ def test_bad_verb_and_token_exclusivity(cfg: Config) -> None:
 
 
 def test_forged_token_is_bad_resumption_token(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     root = call(
         cfg, ("verb", "ListIdentifiers"), ("resumptionToken", "bm90LWEtdG9rZW4")
     )
@@ -337,7 +302,7 @@ def all_pages(cfg: Config, verb: str) -> list[dict]:
 
 
 def test_paging_delivers_every_record_exactly_once(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     small = dataclasses.replace(
         cfg, protocol=dataclasses.replace(cfg.protocol, page_size=1)
     )
@@ -368,7 +333,7 @@ def test_paging_survives_records_sharing_a_datestamp(cfg: Config, tmp_path) -> N
 
 
 def test_complete_list_size_and_cursor(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     small = dataclasses.replace(
         cfg, protocol=dataclasses.replace(cfg.protocol, page_size=1)
     )
@@ -380,7 +345,7 @@ def test_complete_list_size_and_cursor(cfg: Config) -> None:
 
 
 def test_paging_with_payloads(cfg: Config) -> None:
-    seed(cfg, SAMPLE, "dump-a")
+    seed(cfg, SAMPLE)
     small = dataclasses.replace(
         cfg, protocol=dataclasses.replace(cfg.protocol, page_size=1)
     )
@@ -423,7 +388,7 @@ def test_resumption_costs_one_query_per_page(cfg: Config) -> None:
     it in the token - so neither the first page nor a resume issues a second,
     separate COUNT query. Two queries per page is the regression this locks
     out."""
-    seed(cfg, SAMPLE, "dump-trips")
+    seed(cfg, SAMPLE)
     small = dataclasses.replace(
         cfg, protocol=dataclasses.replace(cfg.protocol, page_size=2)
     )

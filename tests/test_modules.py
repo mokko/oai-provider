@@ -106,7 +106,7 @@ def test_module_ingest_strips_namespaces(config: Config) -> None:
     """The one deliberate exception to "payload verbatim": the tree is rebuilt
     with local-name(), so element and attribute names survive and namespace
     URIs do not."""
-    q = QueryBuilder(config.mapping).module_ingest_query()
+    q = QueryBuilder(config.modules, config.timezone_offset).module_ingest_query()
     assert "local:strip" in q
     assert "element { local-name($n) }" in q
     assert "attribute { local-name($a) }" in q
@@ -119,14 +119,14 @@ def test_module_ingest_strips_namespaces(config: Config) -> None:
 def test_module_ingest_writes_the_colleague_path(config: Config) -> None:
     """Records must land where `collection('sync_X')/application/modules/
     module[@name='X']/moduleItem` finds them."""
-    q = QueryBuilder(config.mapping).module_ingest_query()
+    q = QueryBuilder(config.modules, config.timezone_offset).module_ingest_query()
     assert "element application" in q
     assert "element modules" in q
     assert "element module" in q
 
 
 def test_module_count_is_read_only(config: Config) -> None:
-    q = QueryBuilder(config.mapping).module_count_query()
+    q = QueryBuilder(config.modules, config.timezone_offset).module_count_query()
     assert "db:put" not in q
     assert "totalSize" in q
 
@@ -165,7 +165,7 @@ def _run(config: Config, coro):
 
 
 def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> None:
-    builder = QueryBuilder(live.mapping)
+    builder = QueryBuilder(live.modules, live.timezone_offset)
 
     async def ingest_and_count(bx: BaseXClient):
         if await bx.database_exists(TEST_DB):
@@ -271,17 +271,13 @@ def module_config(live: Config, tmp_path) -> Config:
     )
     dump = tmp_path / "two.xml"
     dump.write_text(TWO_MODULES, encoding="utf-8")
-    config = dataclasses.replace(
-        live,
-        modules=mods,
-        basex=dataclasses.replace(live.basex, database="unused-in-module-mode"),
-    )
+    config = dataclasses.replace(live, modules=mods)
     _seed_modules(config, dump)
     return config
 
 
 def _seed_modules(config: Config, dump: Path) -> None:
-    builder = QueryBuilder(config.mapping, config.modules)
+    builder = QueryBuilder(config.modules, config.timezone_offset)
 
     async def go(bx: BaseXClient):
         for module in config.modules:

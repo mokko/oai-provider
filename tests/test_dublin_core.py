@@ -82,6 +82,12 @@ def test_a_term_prefix_must_be_declared() -> None:
         )
 
 
+def _builder(config: Config | None = None) -> QueryBuilder:
+    """The shipped config's builder. The DB names live on the modules."""
+    config = config or Config.load(ROOT / "oai.toml")
+    return QueryBuilder(config.modules, config.timezone_offset)
+
+
 def _derived_config(tmp_path: Path, body: str) -> Config:
     text = (ROOT / "oai.toml").read_text()
     # drop the real formats and modules so the test's own are the only ones
@@ -124,7 +130,7 @@ def test_the_terms_sit_in_an_enclosed_expression() -> None:
     unless it is inside { }. An unbraced `for $v ... return` there is literal
     text and its $v is undeclared - the bug this pins."""
     fmt = _builder_with_dc()
-    qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
+    qb = _builder()
     expr = qb.payload_expr(fmt)
     assert "<oai_dc:dc>{ " in expr
     assert "$v" in expr
@@ -133,7 +139,7 @@ def test_the_terms_sit_in_an_enclosed_expression() -> None:
 def test_an_empty_value_emits_nothing() -> None:
     """The core promise: no blank dc elements."""
     fmt = _builder_with_dc()
-    qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
+    qb = _builder()
     expr = qb.payload_expr(fmt)
     assert "normalize-space(string(.)) ne ''" in expr
 
@@ -144,7 +150,7 @@ def test_the_source_never_carries_a_payload() -> None:
     Measured before the fix: page_size=1 and page_size=100 cost the same,
     because every matching payload was attached and then discarded."""
     cfg = Config.load(ROOT / "oai.toml")
-    qb = QueryBuilder(cfg.mapping, cfg.modules)
+    qb = QueryBuilder(cfg.modules, cfg.timezone_offset)
     src = qb.source_expr()
     assert "<row " in src
     assert "$withPayload" not in src, "the source must not depend on withPayload"
@@ -155,7 +161,7 @@ def test_the_source_never_carries_a_payload() -> None:
 
 def test_the_payload_phase_keys_on_the_page() -> None:
     cfg = Config.load(ROOT / "oai.toml")
-    qb = QueryBuilder(cfg.mapping, cfg.modules)
+    qb = QueryBuilder(cfg.modules, cfg.timezone_offset)
     for fmt in (None, next(f for f in cfg.formats if f.prefix == "ria")):
         expr = qb.payload_expr(fmt)
         assert "$wanted/@identifier" in expr, "payload must be filtered to the page"
@@ -163,7 +169,7 @@ def test_the_payload_phase_keys_on_the_page() -> None:
 
 
 def test_a_literal_is_xml_escaped() -> None:
-    qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
+    qb = _builder()
     expr = qb._term_exprs((TermRule(term="dc:language", literal="a & b <c>"),))
     assert "a &amp; b &lt;c&gt;" in expr
 
@@ -171,7 +177,7 @@ def test_a_literal_is_xml_escaped() -> None:
 def test_terms_are_relative_to_the_variable_that_holds_the_record() -> None:
     """In the payload phase the record is $src (module mode) or $d/env:source
     (envelope mode), never $r - a stale name is an XPST0008 at query time."""
-    qb = QueryBuilder(Config.load(ROOT / "oai.toml").mapping)
+    qb = _builder()
     expr = qb._term_exprs((TermRule(term="dc:type", xpath="a/b"),), "$src")
     assert "($src/a/b)" in expr
     assert "$r/" not in expr
@@ -225,7 +231,7 @@ def dc_config(live: Config) -> Config:
         ),
     )
     cfg = dataclasses.replace(live, modules=(module,))
-    builder = QueryBuilder(cfg.mapping, cfg.modules)
+    builder = QueryBuilder(cfg.modules, cfg.timezone_offset)
 
     async def seed(bx: BaseXClient):
         if await bx.database_exists(TEST_DB):

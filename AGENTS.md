@@ -11,15 +11,16 @@ that looked correct.
 ## Code map
 
 - `oai/config.py` — loads `oai.toml` + `.env`, validates the combination
-  (module mode forces `deletedRecord = "no"`), computes the mapping fingerprint.
-- `oai/mapping.py` — the prefix table and the XPath→OAI field mapping.
+  (module mode forces `deletedRecord = "no"`), holds the module list.
+- `oai/mapping.py` — renders the query templates from the module config: the row
+  expression, the payload expression, and the Dublin Core term rules.
 - `oai/basex.py` — async BaseX REST client (`httpx`), including
   `query_nodes` for queries that return a sequence of nodes.
 - `oai/protocol.py` — the six verbs, error codes, datestamps, resumption
   tokens, `serialise`, and the `xslt_problem` startup probe.
 - `oai/app.py` — the Starlette app; `GET`/`POST /oai`, `GET /healthz`.
-- `xq/*.xq.tmpl` — the query templates: `ingest`, `validate`, `reconcile`,
-  `stale`, `page`, `record`, and the module-mode variants.
+- `xq/*.xq.tmpl` — the query templates: `module_ingest`, `module_count`,
+  `page`, `record`.
 - `tools/ingest.py` — the CLI.
 - `tools/oai_browser.py` — an interactive OAI client (the six verbs from a
   menu) for testing a running provider; a stdlib reimplementation of HTTP::OAI's
@@ -28,49 +29,35 @@ that looked correct.
 ## Ingest
 
 ```
-python tools/ingest.py samples/ria-dump.xml          # three passes
-python tools/ingest.py samples/ria-dump.xml --dry-run -v
+python tools/ingest.py samples/ria-dump.xml            # additive
+python tools/ingest.py samples/ria-dump.xml --dry-run  # per-module counts only
 OAI_BASEX_PASSWORD=... python tools/ingest.py DUMP
 ```
 
-Three passes, because BaseX will not let one query both store and report (a
-query is either updating or returning):
-
-1. **validate** — read-only. Per record: identifier, datestamp, sets, and
-   whether it is storable. This is the only place a bad mapping shows up as a
-   message rather than as records quietly missing.
-2. **ingest** — updating. Envelops and stores every record in the dump, each
-   stamped with the dump it was seen in.
-3. **reconcile** — updating. Tombstones or removes records not seen in this
-   dump.
-
-A run refuses to reconcile if the dump yielded zero storable records, so a
-broken mapping cannot tombstone the whole database.
+One database per `[[modules]]` entry (see "Module mode"). BaseX will not let one
+query both store and report — a query is either updating or returning — so a
+read-only count pass runs before each write pass. A module the dump does not
+carry is skipped (its database untouched); a module present but *empty* is
+refused.
 
 ### Deletions
 
-**The shipped configuration is module mode, where `deletedRecord = "no"`** —
-see "Module mode" below. This paragraph describes the *enveloped* path, which
-reconciles and can therefore serve real tombstones.
+**`deletedRecord = "no"`, and that is the truth here.** The source records no
+deletes, and ingest is additive — it never removes a record — so nothing knows
+what vanished from a dump and no tombstone can be served. Advertising
+`persistent` or `transient` while serving no deletions is the one lie a
+harvester cannot detect, so the combination is **rejected at load time**.
 
-The source system does **not** record deletes, and a sync that only adds or
-overwrites will serve vanished objects as live forever. No harvester can
-recover from that. But the dump is complete, so absence is the delete signal:
-reconciling a full dump is what makes `deletedRecord = "persistent"` honest in
-the enveloped path. Set `deletedRecord = "transient"` to remove instead, or
-`"no"` to leave liveness to the source.
+Consequences worth knowing:
 
-The dump id is a content hash, so re-running an unchanged dump is idempotent
-and cannot be mistaken for a dump that lost records.
-
-**A chunked dump destroys the database if reconciled per file.** The file is
-called *chunk1*, and the ingest derives its dump id from the file's content
-hash, so every chunk gets a different id — and `reconcile` tombstones
-everything not seen in *that* dump. Run per chunk, chunk 2 marks all of chunk 1
-deleted, and **nothing reports an error**. Before pointing real data at it: the
-dump id must be shared across the chunks of one harvest (a dump-set id, e.g. the
-export date plus query id), and reconcile must run **once, after the last
-chunk**. This is the most dangerous thing about the current design.
+- **A record withdrawn in MuseumPlus stays live here.** A harvester learns of a
+  withdrawal by re-harvesting, not from a `status="deleted"` header.
+- **Additive is what makes a chunked dump safe.** Records are written in place,
+  keyed by `<Module>-<id>`, so chunk 2 adds to chunk 1 instead of replacing it.
+  `--reset` is the destructive one: it rebuilds a module database from a single
+  file, so running it per chunk leaves only the last chunk's records.
+- Tombstone support is an **open question**, blocked on what the colleague's
+  setup does — see `todo/deleted-records.md`.
 
 ## Module mode — one database per module
 
@@ -97,8 +84,7 @@ python tools/ingest.py sdata/Dump.xml --reset       # DROP and rebuild each db
   added, an existing id replaced, and a record the dump does not mention left
   alone — so importing several chunks of one export just works. `--reset` drops
   and rebuilds each database from that one file (and prints what it drops
-  first); running it per chunk would make the last chunk the only data, the
-  module-mode version of the enveloped path's per-chunk reconcile trap. A module
+  first); running it per chunk would make the last chunk the only data. A module
   **absent** from a dump is skipped (its database untouched), so a per-module
   file merges cleanly; a module present but *empty* is refused.
 - **Namespaces are stripped on the way in** (a recursive XQuery `local:strip()`
@@ -130,28 +116,27 @@ python tools/ingest.py sdata/Dump.xml --reset       # DROP and rebuild each db
 ### Serving from the module databases
 
 With `[[modules]]` present the six verbs read **all the module databases** and
-serve one OAI repository. The two storage shapes are normalized to a single
-`<row>` (identifier, datestamp, status, sets + payload), so paging, the
+serve one OAI repository. Each module is normalized to a single `<row>`
+(identifier, datestamp, status, sets + payload), so paging, the
 resumption-token cursor, set filtering and `GetRecord` have **one code path**
-whether the data is enveloped or module-split.
+across every module.
 
-- **A record has no envelope**, so `identifier` and `datestamp` are derived per
-  module at query time — `identifierPrefix` + `@id`, and
-  `systemField[@name='__lastModified']/value` shifted to UTC by
-  `mapping.timezoneOffset`. Each `[[modules]]` entry may override `records`,
+- **A record is bare**, so `identifier` and `datestamp` are derived per module
+  at query time — `identifierPrefix` + `@id`, and
+  `systemField[@name='__lastModified']/value` shifted to UTC by the
+  `[datestamps] timezoneOffset`. Each `[[modules]]` entry may override `records`,
   `identifier` and `datestamp`, and carries its own `[[modules.sets]]`
   allow-list.
 - **The cursor spans the union**: rows from every module are sorted by
   `(datestamp, identifier)`. Identifiers are globally unique because of the
   module prefixes, so the pair is a total order across databases and a harvest
   neither skips nor repeats a record.
-- **`deletedRecord` is `"no"` in module mode.** A module database is dropped and
-  rebuilt on every ingest, so nothing records what vanished and no tombstone is
-  ever served. Claiming `"persistent"` would be the one lie a harvester cannot
-  detect, so the combination is **rejected at load time** — module mode plus a
-  `deletedRecord` other than `"no"` is a configuration error, not a note in the
-  docs. The source owns liveness; a harvester learns of a withdrawal by
-  re-harvesting.
+- **`deletedRecord` is `"no"`.** Ingest is additive and never deletes a record,
+  so nothing records what vanished and no tombstone is ever served. Claiming
+  `"persistent"` would be the one lie a harvester cannot detect, so the
+  combination is **rejected at load time** — module mode plus a `deletedRecord`
+  other than `"no"` is a configuration error, not a note in the docs. The source
+  owns liveness; a harvester learns of a withdrawal by re-harvesting.
 
 ## Serving
 
@@ -273,11 +258,11 @@ xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
 ## Sets
 
 Sets are an **explicit allow-list**. Each entry pairs an XPath (a membership
-predicate; its value is ignored) with a hand-written `spec` and `label`. **Which
-table holds them depends on the storage mode**: `[[mapping.sets]]` for the
-enveloped path, `[[modules.sets]]` for module mode (the deployment path). A set
-declared in the wrong one is silently inert — which is why `ListSets` returned
-`noSetHierarchy` until the entry below landed under `[[modules.sets]]`.
+predicate; its value is ignored) with a hand-written `spec` and `label`. They
+live under `[[modules.sets]]`, because a set belongs to the module whose records
+it filters. A set whose XPath matches nothing is silently inert — `ListSets`
+just returns `noSetHierarchy` — which is exactly how a misconfigured set hides,
+so verify with a request rather than by reading the config.
 
 ```toml
 # module mode - the real set. "KK" is our internal label for the
@@ -414,10 +399,10 @@ the export date, which changes on every export.
 - **`db:put(db, node, path)` replaces, so re-ingest is idempotent.**
 - **A write pass cannot also report.** `let $u := db:put(...)` fails with
   `[XUST0001]`; BaseX's own `update {}` keyword fails with "Update target was
-  not created by transform expression". Design ingest as validate → write →
-  reconcile with the counts coming from the read-only pass.
+  not created by transform expression". So ingest counts with a separate
+  read-only query before the write pass.
 - **In TOML, a key written after a `[[table]]` header belongs to that table.**
-  Putting a scalar below `[[mapping.sets]]` silently attaches it to the last set
+  Putting a scalar below `[[modules.sets]]` silently attaches it to the last set
   rule. Keep scalar keys above the first array-of-tables header.
 
 ## Testing conventions
@@ -445,8 +430,10 @@ the export date, which changes on every export.
   best for probing), `bin/basexhttp` (background), `bin/basexhttpstop`.
 - **REST is 8080**, client/server 1984, stop 8081. Older docs saying 8984 are
   wrong for 12.x.
-- Dedicated dev user `oai` / `devpass` (admin is protected). Test DBs: `oaitest`,
-  `mpxdb`, `riadb`, `riadb2`, `oai_provider_test`.
+- Dedicated dev user `oai` (the `admin` account is separate and has its own
+  password). The data lives in `sync_Object` / `sync_Person` / `sync_Multimedia`;
+  everything else (`mpxdb`, `riadb`, `riadb2`, `oaitest`, `oai_provider_*`,
+  `oai_*_check`) is scratch left behind by test runs.
 - **The HTTP server caches the user list at startup.** After `CREATE USER`,
   restart it or REST keeps answering "Access denied: <user>", which looks exactly
   like a wrong password.

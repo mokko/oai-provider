@@ -151,14 +151,7 @@ class BaseXClient:
     async def drop_database(self, name: str) -> None:
         await self.command(f"DROP DB {name}")
 
-    async def count_records(self, database: str, envelope_ns: str) -> int:
-        text = await self.query(
-            'declare namespace env = "' + envelope_ns + '";'
-            f"count(collection({database!r})/env:record)"
-        )
-        return int(text.strip() or 0)
-
     async def count_documents(self, database: str) -> int:
-        """How many documents a database holds, envelope or not."""
+        """How many documents a database holds."""
         text = await self.query(f"count(collection({database!r}))")
         return int(text.strip() or 0)

@@ -110,7 +110,7 @@ def test_lido_pages_objects_only(config: Config) -> None:
     """A format that serves a subset of modules *is* that subset's result set:
     the header rows must not include persons or assets."""
     fmt = next(f for f in config.formats if f.prefix == "lido")
-    qb = QueryBuilder(config.mapping, config.modules)
+    qb = QueryBuilder(config.modules, config.timezone_offset)
     src = qb.source_expr(fmt)
     assert src.count("<row ") == 1, "only one module's rows"
     assert "sync_Object" in src
@@ -121,7 +121,7 @@ def test_lido_pages_objects_only(config: Config) -> None:
 
 def test_the_transform_runs_inside_basex(config: Config) -> None:
     fmt = next(f for f in config.formats if f.prefix == "lido")
-    qb = QueryBuilder(config.mapping, config.modules)
+    qb = QueryBuilder(config.modules, config.timezone_offset)
     expr = qb.payload_expr(fmt)
     assert "xslt:transform(" in expr
     assert fmt.stylesheet in expr
@@ -134,7 +134,7 @@ def test_the_transform_runs_inside_basex(config: Config) -> None:
 
 def test_the_world_is_rebuilt_from_all_the_databases(config: Config) -> None:
     fmt = next(f for f in config.formats if f.prefix == "lido")
-    qb = QueryBuilder(config.mapping, config.modules)
+    qb = QueryBuilder(config.modules, config.timezone_offset)
     expr = qb.payload_expr(fmt)
     # itself
     assert "<module name=\"Object\">{ local:zetcom($src) }</module>" in expr
