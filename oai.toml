@@ -83,12 +83,12 @@ tokenTTL = 86400
 # development, not for exposure.
 tokenSecret = "dev-token-secret-change-me"
 
-# Metadata formats to advertise. Only "passthrough" is implemented: the
-# stored payload is served verbatim inside <metadata>, which is why the
-# metadata namespace is Zetcom's.
-#
-# NOTE: no oai_dc. Deriving Dublin Core would need a field-by-field mapping
-# (title, creator, date, rights ...) and that decision has not been made yet.
+# Metadata formats to advertise. A format is one of:
+#   passthrough - the stored payload is served verbatim inside <metadata>
+#   derived     - assembled at serve time from the stored payload (oai_dc)
+#   xslt        - produced by a stylesheet running inside BaseX (lido)
+# An unknown `kind` is rejected at load time, not silently served as an
+# empty <metadata>. Three formats are configured below.
 [[metadata.formats]]
 prefix = "ria"
 namespace = "http://www.zetcom.com/ria/ws/module"
