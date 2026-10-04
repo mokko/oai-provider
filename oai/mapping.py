@@ -297,7 +297,7 @@ class QueryBuilder:
                 return module
         return None
 
-    def _related_forward(self, other, ref_name: str, id_var: str = "$objId") -> str:
+    def _related_forward(self, other, ref_name: str) -> str:
         """Records of `other` that THIS record points at.
 
         `ObjPerAssociationRef` on an object names person ids; the stylesheet
@@ -573,7 +573,6 @@ class QueryBuilder:
                 if fmt is not None and fmt.related_works_online_only
                 else ""
             ),
-            "TZOFFSET": self.timezone_offset,
             **extra,
         }
         for key, value in subs.items():

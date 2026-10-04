@@ -150,8 +150,6 @@ def _fmt(dt: datetime, granularity: str) -> str:
 
 
 def _is_valid_ts(value: str, granularity: str) -> bool:
-    import re
-
     if granularity == "YYYY-MM-DD":
         if not re.fullmatch(TS_DAY, value):
             return False
@@ -372,13 +370,6 @@ def _el(parent: ET.Element, name: str, **attrs: str) -> ET.Element:
     return child
 
 
-def envelope(verb: str, request_el: ET.Element) -> ET.Element:
-    root = ET.Element(q("OAI-PMH"))
-    root.set(f"{{{XSI_NS}}}schemaLocation",
-             f"{OAI_NS} http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd")
-    return root
-
-
 def error_response(request: ET.Element, exc: ProtocolError, granularity: str) -> ET.Element:
     root = ET.Element(q("OAI-PMH"))
     root.set(f"{{{XSI_NS}}}schemaLocation",
@@ -408,7 +399,7 @@ def make_request_el(base_url: str, pairs: list[tuple[str, str]]) -> ET.Element:
     return el
 
 
-def header_el(row: ET.Element, oai_id_attr: str = "identifier") -> ET.Element:
+def header_el(row: ET.Element) -> ET.Element:
     header = ET.Element(q("header"))
     if row.get("status") == "deleted":
         header.set("status", "deleted")
