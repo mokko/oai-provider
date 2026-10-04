@@ -716,7 +716,33 @@ class Provider:
         return root
 
 
-def serialise(root: ET.Element) -> bytes:
+def _pretty_print(elem: ET.Element, level: int = 0, space: str = "  ") -> None:
+    """Indent an element tree for human reading, in place.
+
+    It **stops at a `<metadata>` element**: that content is the served payload,
+    kept verbatim, so inserting whitespace text nodes there would change it.
+    Everything else is ours to format, and an XML parser ignores the whitespace
+    either way.
+    """
+    if elem.tag == q("metadata"):
+        return
+    children = list(elem)
+    if not children:
+        return
+    pad = "\n" + space * (level + 1)
+    for child in children:
+        _pretty_print(child, level + 1, space)
+    if elem.text is None or not elem.text.strip():
+        elem.text = pad
+    for i, child in enumerate(children):
+        if child.tail is not None and child.tail.strip():
+            continue
+        child.tail = pad if i < len(children) - 1 else "\n" + space * level
+
+
+def serialise(root: ET.Element, pretty: bool = False) -> bytes:
+    if pretty:
+        _pretty_print(root)
     return b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
         root, encoding="utf-8"
     )

@@ -152,6 +152,38 @@ def test_token_is_opaque_not_readable() -> None:
     assert "{" not in token
 
 
+def test_pretty_print_indents_the_envelope_but_not_the_payload() -> None:
+    """`prettyPrint` is a render option, not a protocol one: it indents our
+    envelope and never inserts whitespace inside <metadata>, whose content is
+    served verbatim. Both documents are identical to an XML parser."""
+    from xml.etree import ElementTree as ET
+
+    from oai.protocol import q, serialise
+
+    root = ET.Element(q("OAI-PMH"))
+    node = ET.SubElement(root, q("GetRecord"))
+    header = ET.SubElement(node, q("header"))
+    ET.SubElement(header, q("identifier")).text = "id-1"
+    metadata = ET.SubElement(node, q("metadata"))
+    payload = ET.SubElement(metadata, "{urn:test}record")
+    payload.text = "  keep me  "
+
+    compact = serialise(root, pretty=False)
+    pretty = serialise(root, pretty=True)
+
+    # compact is one line (only the XML declaration's newline); pretty is not
+    assert compact.count(b"\n") == 1
+    assert pretty.count(b"\n") > 3
+    # the payload subtree is untouched - no whitespace node injected into it
+    assert metadata.text is None
+    assert payload.text == "  keep me  "
+    assert payload.tail is None
+    # and any XML parser sees the same document
+    assert ET.canonicalize(compact.decode(), strip_text=True) == ET.canonicalize(
+        pretty.decode(), strip_text=True
+    )
+
+
 def test_tampered_token_is_rejected() -> None:
     token = encode_token(state(), SECRET)
     body, _, sig = token.partition(".")

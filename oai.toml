@@ -78,6 +78,10 @@ xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@mo
 pageSize = 100
 # resumption tokens expire, which is what replaces server-side eviction
 tokenTTL = 86400
+# Indent the OAI envelope so it reads in a browser. Cosmetic: it never formats
+# inside <metadata>, whose content is served verbatim, and an XML parser ignores
+# the whitespace either way. Off by default; compact is the wire format.
+prettyPrint = false
 # DEV PLACEHOLDER. Prefer OAI_TOKEN_SECRET. Without a secret tokens are
 # unsigned, so they cannot be trusted to be untampered - fine for local
 # development, not for exposure.

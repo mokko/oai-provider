@@ -215,6 +215,10 @@ class ProtocolSettings:
     token_ttl: int = 86400
     token_secret: str = ""
     from_env: bool = False
+    # Cosmetic only: indent the OAI envelope so it reads in a browser. It never
+    # formats inside <metadata>, whose content is served verbatim, so enabling
+    # it cannot change a payload. Off by default - compact is the wire format.
+    pretty: bool = False
 
 
 @dataclass(frozen=True)
@@ -536,6 +540,7 @@ class Config:
             token_ttl=int(proto_raw.get("tokenTTL", 86400)),
             token_secret=secret,
             from_env=bool(secret_env),
+            pretty=bool(proto_raw.get("prettyPrint", False)),
         )
         if protocol.page_size < 1:
             raise ConfigError("protocol.pageSize must be >= 1")

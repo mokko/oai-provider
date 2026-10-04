@@ -62,7 +62,7 @@ def create_app(config: Config, client: BaseXClient | None = None) -> Starlette:
         provider = Provider(config, state["client"])  # type: ignore[arg-type]
         root = await provider.handle(pairs)
         return Response(
-            serialise(root),
+            serialise(root, config.protocol.pretty),
             media_type="text/xml; charset=utf-8",
             status_code=200,
         )
