@@ -1,10 +1,11 @@
-# Related works: online status + ISIL, resolved inside BaseX — plan
+# Related works: online status + ISIL, resolved inside BaseX — implemented
 
-**Status: not implemented.** This is the **lvl2 conversion** step of the user's `mokko/zml2lido`
-tool — the Python/lxml pass (`LidoTool.to_lvl2_single` → `LinkChecker.fixRelatedWorks`) that runs
-*after* the XSLT. It is the one part of lvl2 the provider does not reproduce yet. Everything needed
-to build it is below; the XQuery was run against BaseX 12.4 on this box (the same one the provider
-uses) and produces the right output.
+**Status: implemented** (`08c358b`, behind the `relatedWorksOnlineOnly` config switch). This is the
+**lvl2 conversion** step of the user's `mokko/zml2lido` tool — the Python/lxml pass
+(`LidoTool.to_lvl2_single` → `LinkChecker.fixRelatedWorks`) that runs *after* the XSLT. It now runs
+in the provider against the local store instead of a second RIA query. The file is kept as the
+record of what it does, why, the verified XQuery it was built from, and the one question still open
+(KUE.ID / MM.ID targets).
 
 ## Where lvl2 comes from
 
@@ -167,17 +168,26 @@ Note the two-map split: an object can be **online but have no ISIL**. Such a set
 (online) but *not* rewritten (no ISIL), and left with `@source=OBJ.ID` — never half-rewritten into
 the `@source=ISIL/ID`-with-a-bare-number state zml2lido produces.
 
-## Wiring into the provider
+## How it is wired (implemented)
 
-- Add `local:isOnline` / `local:isil` beside the existing inline prolog functions
-  (`ZETCOM_FUNCTION`, `OAI_DATE_FUNCTION`, `oai/mapping.py:29‑63`).
-- In `_xslt_payload` (`oai/mapping.py:264‑279`), after
-  `let $out := xslt:transform($input, …)` run the three passes above and select
-  `record_select` from the pruned tree instead of `$out`.
-- Bind `$vocmap` as an external variable from config (the deployment copy the stylesheet already
-  needs — BaseX's cwd copies, or `data/lido/vocmap.xml`; pick the authoritative one and say which).
+- `local:isOnline`, `local:isil`, `local:verwaltendeInstitution` and `local:fixRelatedWorks` are
+  inline prolog functions in `oai/mapping.py` (`RELATED_WORKS_FUNCTION`), emitted only for a format
+  whose `relatedWorksOnlineOnly` is set. The prune uses the prefix the format chose rather than a
+  hardcoded `z:` (`8aa6236`).
+- `_xslt_payload` runs the three passes after `xslt:transform` and lifts the record from the pruned
+  tree (`$fixed`).
+- The switch is per format: `relatedWorksOnlineOnly = true` and `vocmap = "data/lido/vocmap.xml"` in
+  `oai.toml`. `Config.load` resolves `vocmap` against the config file and refuses the combination
+  without it, or without the LIDO prefix bound to `lido`.
+- `$vocmap` is bound as an external variable from config (`Provider.source_vars`), never a relative
+  `doc()`.
 
-## Tests to add
+## Tests — the rule itself is still unverified
+
+Pinned today: the query text carries `local:fixRelatedWorks(` and the record is lifted from `$fixed`
+(`tests/test_lido.py`), and the round trip proves the ISIL map is found because the served
+`lidoRecID` carries an ISIL from `vocmap.xml`. **The rule below is not covered** — these are still
+wanted:
 
 - An online target → `@source=ISIL/ID`, text `ISIL/id`, `lido:type` kept.
 - An offline target → the `relatedWorkSet` is gone and an emptied wrap is gone.
