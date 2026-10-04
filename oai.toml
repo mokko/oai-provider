@@ -44,6 +44,14 @@ records = "/m:application/m:modules/m:module[@name='Object']/m:moduleItem"
 identifier = "@id"
 identifierPrefix = "spk-berlin.de:EM-objId-"
 
+# This is the **enveloped** path's prefix. Module mode (the deployment path)
+# takes its prefix from each [[modules]] entry instead - the Object one is
+# "spk-berlin.de:object-" and deliberately dropped the "EM-". The two are
+# distinct on purpose: the enveloped path keys on the envelope's own @id (what
+# the old MPX provider called objId), while module mode keys on each module's
+# __id. Renaming this string re-identifies every record this path has already
+# served, so it is not a free cleanup.
+
 # __lastModified is the record's own modification time - the thing MPX never
 # had, and the reason the old provider fell back to the export date.
 datestamp = "m:systemField[@name='__lastModified']/m:value"
