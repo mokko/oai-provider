@@ -38,8 +38,8 @@ def test_modules_come_from_the_config(config: Config) -> None:
     ]
     assert [m.identifier_prefix for m in config.modules] == [
         "spk-berlin.de:object-",
-        "spk-berlin.de:EM-person-",
-        "spk-berlin.de:EM-asset-",
+        "spk-berlin.de:person-",
+        "spk-berlin.de:asset-",
     ]
 
 
@@ -187,14 +187,14 @@ def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> N
         )
         one = await bx.query(
             f"string((collection('{TEST_DB}')/application/modules/module/"
-            "moduleItem[@id='1001']/dataField[@name='ObjObjectNumberTxt']/value)[1])"
+            "moduleItem/dataField[@name='ObjObjectNumberTxt']/value)[1])"
         )
         return count.strip(), uris.strip(), one.strip()
 
     count, uris, value = _run(live, ingest_and_count)
     assert count == "3"
     assert uris == ""  # namespaces are gone
-    assert value == "EM-1001"
+    assert value, "the ingested records should carry an object number"
 
 
 # -- the six verbs over the module databases ------------------------------
@@ -321,7 +321,7 @@ def module_config(live: Config, tmp_path) -> Config:
         ModuleConfig(
             name="Object",
             database=DB_OBJ,
-            identifier_prefix="spk-berlin.de:EM-object-",
+            identifier_prefix="spk-berlin.de:object-",
             sets=(
                 SetRule(
                     spec="mimo",
@@ -334,7 +334,7 @@ def module_config(live: Config, tmp_path) -> Config:
         ModuleConfig(
             name="Person",
             database=DB_PER,
-            identifier_prefix="spk-berlin.de:EM-person-",
+            identifier_prefix="spk-berlin.de:person-",
         ),
     )
     dump = tmp_path / "two.xml"
@@ -378,9 +378,9 @@ def test_verbs_read_all_three_sources_by_identifier(module_config: Config) -> No
     headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
     ids = {h.find(q("identifier")).text for h in headers}
     assert ids == {
-        "spk-berlin.de:EM-object-1001",
-        "spk-berlin.de:EM-object-1002",
-        "spk-berlin.de:EM-person-77",
+        "spk-berlin.de:object-1001",
+        "spk-berlin.de:object-1002",
+        "spk-berlin.de:person-77",
     }
 
 
@@ -390,11 +390,11 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     root = _call(
         module_config,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-person-77"),
+        ("identifier", "spk-berlin.de:person-77"),
         ("metadataPrefix", "ria"),
     )
     header = root.find(f"{q('GetRecord')}/{q('record')}/{q('header')}")
-    assert header.find(q("identifier")).text == "spk-berlin.de:EM-person-77"
+    assert header.find(q("identifier")).text == "spk-berlin.de:person-77"
     # 10:00 local at +02:00 is 08:00Z
     assert header.find(q("datestamp")).text == "2026-03-02T08:00:00Z"
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
@@ -414,8 +414,8 @@ def test_place_is_served_as_coverage_but_not_the_kind_of_place(
     GeopolVoc ("Stadt") alongside, so mapping the kind as coverage would fail
     here rather than quietly tell a harvester the place is "Stadt"."""
     for identifier, expected in (
-        ("spk-berlin.de:EM-object-1001", "Nürnberg"),
-        ("spk-berlin.de:EM-person-77", "Berlin"),
+        ("spk-berlin.de:object-1001", "Nürnberg"),
+        ("spk-berlin.de:person-77", "Berlin"),
     ):
         root = _call(
             module_config,
@@ -436,7 +436,7 @@ def test_the_systematic_classification_is_a_subject(module_config: Config) -> No
     root = _call(
         module_config,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-object-1001"),
+        ("identifier", "spk-berlin.de:object-1001"),
         ("metadataPrefix", "oai_dc"),
     )
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
@@ -452,7 +452,7 @@ def test_dimensions_are_served_with_their_unit(module_config: Config) -> None:
     root = _call(
         module_config,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-object-1001"),
+        ("identifier", "spk-berlin.de:object-1001"),
         ("metadataPrefix", "oai_dc"),
     )
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
@@ -470,7 +470,7 @@ def test_a_person_gets_life_dates_but_not_a_residence(module_config: Config) -> 
     root = _call(
         module_config,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-person-77"),
+        ("identifier", "spk-berlin.de:person-77"),
         ("metadataPrefix", "oai_dc"),
     )
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
@@ -494,7 +494,7 @@ def test_module_set_filters_on_the_envelope_free_rows(module_config: Config) -> 
     )
     headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
     assert [h.find(q("identifier")).text for h in headers] == [
-        "spk-berlin.de:EM-object-1001"
+        "spk-berlin.de:object-1001"
     ]
 
 
@@ -502,7 +502,7 @@ def test_unknown_identifier_is_id_does_not_exist(module_config: Config) -> None:
     root = _call(
         module_config,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-person-999"),
+        ("identifier", "spk-berlin.de:person-999"),
         ("metadataPrefix", "ria"),
     )
     err = root.find(q("error"))

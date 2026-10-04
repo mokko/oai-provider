@@ -34,11 +34,12 @@ def base_config() -> Config:
         database=TEST_DB,
         identifier_prefix="spk-berlin.de:object-",
         sets=(
+            # the KK owner reference, which the real records carry
             SetRule(
-                spec="mimo",
-                label="Musikinstrumente",
-                xpath="moduleReference[@name='ObjObjectGroupsRef']"
-                "/moduleReferenceItem[@moduleItemId='6054']",
+                spec="KK",
+                label="Kupferstichkabinett, Staatliche Museen zu Berlin",
+                xpath="moduleReference[@name='ObjOwnerRef']"
+                "/moduleReferenceItem[@moduleItemId='112264']",
             ),
         ),
     )
@@ -106,7 +107,7 @@ def test_get_and_post_are_equivalent(client) -> None:
     params = {
         "verb": "ListIdentifiers",
         "metadataPrefix": "ria",
-        "set": "mimo",
+        "set": "KK",
     }
     get = client.get("/oai", params=params)
     post = client.post("/oai", data=params)
@@ -116,7 +117,7 @@ def test_get_and_post_are_equivalent(client) -> None:
         return re.sub(r"<[^>]*responseDate>[^<]*<", "<responseDate/>", body)
 
     assert strip_timestamp(get.text) == strip_timestamp(post.text)
-    assert "spk-berlin.de:object-1001" in get.text
+    assert "spk-berlin.de:object-" in get.text
 
 
 def test_post_with_a_duplicate_argument_is_rejected(client) -> None:

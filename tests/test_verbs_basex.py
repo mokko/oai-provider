@@ -32,17 +32,13 @@ def base_config() -> Config:
         database=TEST_DB,
         identifier_prefix="spk-berlin.de:object-",
         sets=(
+            # The KK owner reference: every real record carries it, unlike the
+            # group ids the old hand-written fixture used.
             SetRule(
-                spec="mimo",
-                label="Musikinstrumente",
-                xpath="moduleReference[@name='ObjObjectGroupsRef']"
-                "/moduleReferenceItem[@moduleItemId='6054']",
-            ),
-            SetRule(
-                spec="78",
-                label="Schellackplatten",
-                xpath="moduleReference[@name='ObjObjectGroupsRef']"
-                "/moduleReferenceItem[@moduleItemId='78']",
+                spec="KK",
+                label="Kupferstichkabinett, Staatliche Museen zu Berlin",
+                xpath="moduleReference[@name='ObjOwnerRef']"
+                "/moduleReferenceItem[@moduleItemId='112264']",
             ),
         ),
     )
@@ -72,6 +68,18 @@ def cfg() -> Config:
     if not _live(c):
         pytest.skip("BaseX not answering")
     return c
+
+
+def first_identifier(cfg: Config) -> str:
+    """An identifier the fixture actually holds, read from the repository.
+
+    Derived rather than hard-coded: the fixture is now real records, whose ids
+    are whatever the export says.
+    """
+    root = call(cfg, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
+    hdr = root.find(f"{q('ListIdentifiers')}/{q('header')}")
+    assert hdr is not None, "no identifiers served"
+    return hdr.findtext(q("identifier")) or ""
 
 
 def seed(cfg: Config, dump: Path, reset: bool = True) -> None:
@@ -161,7 +169,7 @@ def test_list_sets_uses_config_labels(cfg: Config) -> None:
         s.findtext(q("setSpec")): s.findtext(q("setName"))
         for s in root.iter(q("set"))
     }
-    assert sets == {"mimo": "Musikinstrumente", "78": "Schellackplatten"}
+    assert sets == {"KK": "Kupferstichkabinett, Staatliche Museen zu Berlin"}
 
 
 # -- GetRecord --------------------------------------------------------------
@@ -169,15 +177,17 @@ def test_list_sets_uses_config_labels(cfg: Config) -> None:
 
 def test_get_record_returns_header_and_payload(cfg: Config) -> None:
     seed(cfg, SAMPLE)
+    ident = first_identifier(cfg)
     root = call(
         cfg,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:object-1001"),
+        ("identifier", ident),
         ("metadataPrefix", "ria"),
     )
     hdrs = headers(root)
-    assert hdrs[0]["identifier"] == "spk-berlin.de:object-1001"
-    assert hdrs[0]["sets"] == ["mimo"]
+    assert hdrs[0]["identifier"] == ident
+    # every real record in this collection is held by the Kupferstichkabinett
+    assert hdrs[0]["sets"] == ["KK"]
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert md is not None
     payload = list(md)[0]
@@ -185,7 +195,7 @@ def test_get_record_returns_header_and_payload(cfg: Config) -> None:
     # is not admissible under <metadata>'s namespace="##other" wildcard, so the
     # RIA namespace is rebuilt at serve time (local:zetcom), as for the XSLT path.
     assert payload.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
-    assert payload.get("id") == "1001"
+    assert payload.get("id") == ident.rsplit("-", 1)[-1]
 
 
 def test_records_are_wrapped_as_the_schema_requires(cfg: Config) -> None:
@@ -197,7 +207,7 @@ def test_records_are_wrapped_as_the_schema_requires(cfg: Config) -> None:
     gr = call(
         cfg,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:object-1001"),
+        ("identifier", first_identifier(cfg)),
         ("metadataPrefix", "ria"),
     )
     assert gr.find(f"{q('GetRecord')}/{q('record')}") is not None
@@ -270,16 +280,26 @@ def test_bad_datestamp_is_bad_argument(cfg: Config) -> None:
 
 
 def test_day_granularity_until_covers_the_whole_day(cfg: Config) -> None:
-    """until=2026-09-19 must include a record at 06:15 on the 19th."""
+    """`until=<a day>` must include records *during* that day, not just at its
+    start. Derived from the fixture: the last datestamp's day is used as `until`,
+    so a plain `le` comparison that ignored the time would have dropped it."""
     seed(cfg, SAMPLE)
+    every = call(cfg, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
+    stamps = [
+        h.findtext(q("datestamp"))
+        for h in every.iter(q("header"))
+        if h.findtext(q("datestamp"))
+    ]
+    assert stamps, "no datestamps served"
+    day = max(stamps)[:10]
     root = call(
         cfg,
         ("verb", "ListIdentifiers"),
         ("metadataPrefix", "ria"),
-        ("until", "2026-09-19"),
+        ("until", day),
     )
     ids = {h["identifier"] for h in headers(root)}
-    assert "spk-berlin.de:object-1001" in ids
+    assert len(ids) == len(stamps), (day, sorted(ids), sorted(stamps))
 
 
 def test_bad_verb_and_token_exclusivity(cfg: Config) -> None:
@@ -341,9 +361,12 @@ def test_paging_survives_records_sharing_a_datestamp(cfg: Config, tmp_path) -> N
     cursor key a peer is skipped, and the harvest still ends as if complete.
     """
     text = SAMPLE.read_text()
-    # give 1002 and 1003 the same __lastModified as 1001
-    text = text.replace("2026-08-01 09:00:00.0", "2026-09-19 08:15:00.0")
-    text = text.replace("2026-07-02 12:30:45.5", "2026-09-19 08:15:00.0")
+    # give every record the first record's __lastModified, whatever they are:
+    # derived from the file so it keeps working when the fixture is replaced
+    stamps = re.findall(r'name="__lastModified">\s*<value>([^<]+)</value>', text)
+    assert len(stamps) >= 2, f"expected several records, found {stamps}"
+    for stamp in stamps[1:]:
+        text = text.replace(stamp, stamps[0])
     tied = tmp_path / "tied.xml"
     tied.write_text(text)
 

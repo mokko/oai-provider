@@ -122,12 +122,12 @@ def state(**over) -> TokenState:
         fingerprint=fp(),
         pinned_until="2026-09-29T12:00:00Z",
         last_datestamp="2026-09-19T06:15:00Z",
-        last_identifier="spk-berlin.de:EM-objId-1001",
+        last_identifier="spk-berlin.de:object-851035",
         prefix="ria",
         issued_at=int(time.time()),
         delivered=100,
         complete_list_size=250,
-        set_spec="mimo",
+        set_spec="KK",
         from_="2026-01-01T00:00:00Z",
     )
     base.update(over)
@@ -142,7 +142,7 @@ def test_token_roundtrip() -> None:
     assert back.last_identifier == original.last_identifier
     assert back.pinned_until == original.pinned_until
     assert back.complete_list_size == 250
-    assert back.set_spec == "mimo"
+    assert back.set_spec == "KK"
 
 
 def test_token_is_opaque_not_readable() -> None:

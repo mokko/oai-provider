@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -23,6 +24,19 @@ TEST_DB = "oai_dc_check"
 
 DC_NS = "http://purl.org/dc/elements/1.1/"
 OAI_DC_NS = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+ZETCOM = "{http://www.zetcom.com/ria/ws/module}"
+
+
+def _sample_ids() -> list[str]:
+    """The Object record ids in the fixture, in document order.
+
+    Derived rather than hard-coded: the fixture is real records now, so their ids
+    are the export's, and asserting on a made-up one would be asserting on a
+    fixture rather than on the provider.
+    """
+    root = ET.parse(SAMPLE).getroot()
+    return [i.get("id") or "" for i in root.iter(ZETCOM + "moduleItem")]
+
 
 
 @pytest.fixture()
@@ -306,12 +320,12 @@ def test_get_record_as_dublin_core(dc_config: Config) -> None:
     root = _call(
         dc_config,
         ("verb", "GetRecord"),
-        ("identifier", "x:obj-1001"),
+        ("identifier", f"x:obj-{_sample_ids()[0]}"),
         ("metadataPrefix", "oai_dc"),
     )
     terms = _dc_of(root)
-    assert ("identifier", "EM-1001") in terms
-    assert ("title", "Trommel aus Ghana") in terms
+    assert ("identifier", "79 D 2, fol. 23 recto") in terms
+    assert ("title", "Päpstlicher Statuenhof und Brunnenmonument") in terms
     assert ("language", "de") in terms
 
 
@@ -320,7 +334,7 @@ def test_a_term_with_no_source_is_absent_not_empty(dc_config: Config) -> None:
     root = _call(
         dc_config,
         ("verb", "GetRecord"),
-        ("identifier", "x:obj-1002"),
+        ("identifier", f"x:obj-{_sample_ids()[1]}"),
         ("metadataPrefix", "oai_dc"),
     )
     terms = dict(_dc_of(root))
@@ -335,7 +349,7 @@ def test_the_shipped_mapping_serves_dublin_core_from_the_real_modules(
     ria = _call(
         dc_config,
         ("verb", "GetRecord"),
-        ("identifier", "x:obj-1001"),
+        ("identifier", f"x:obj-{_sample_ids()[0]}"),
         ("metadataPrefix", "ria"),
     )
     md = ria.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")

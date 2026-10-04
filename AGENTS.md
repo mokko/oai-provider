@@ -114,9 +114,10 @@ python tools/ingest.py sdata/Dump.xml --reset       # DROP and rebuild each db
 - **The module tag distinguishes the records.** `@id` is unique only within a
   module — the ranges overlap (Object reaches 935894, Person 1764036,
   Multimedia 8533256, and one id appears as both an Object and a Multimedia
-  record) — so each module carries an identifier prefix: `object-`,
-  `EM-person-`, `EM-asset-` (the Object prefix dropped the `EM-` on request;
-  the other two still carry it).
+  record) — so each module carries an identifier prefix: `object-`, `person-`,
+  `asset-`. All three dropped the `EM-` they used to carry, because `EM` means
+  nothing in this export — every `__orgUnit` is `KK…` — so it was a leftover of
+  the old MPX convention rather than an institution tag.
 - **Getting files out of the zips.** The samples arrive as zips whose single
   entry is **LZMA (method 14)**. Info-ZIP's `unzip` refuses ("need PK compat.
   v6.3"), and there is no 7z or bsdtar on this box. Python's `zipfile` handles
@@ -303,11 +304,13 @@ silently do nothing.
 - **The mapping is authored, not inferred.** Each term is a field the record
   really has, or a literal declared as one (`dc:language = "de"`). Nothing is
   invented — but the corollary bit us once: `dc:title` was left out for objects
-  because the *sample fixture* has no title, while the real export titles every
-  object (`ObjObjectTitleVrt`, 1000/1000, equal to the `ObjObjectTitleGrp` item
-  with `SortLnu = 1` in all 1000). **Fixture and real data disagree in both
-  directions** — the fixture carries `ObjObjectTitleClb`, which the export never
-  has. Count coverage against the module databases, never against the fixture.
+  because the *sample fixture then in use* had no title, while the real export
+  titles every object (`ObjObjectTitleVrt`, 1000/1000, equal to the
+  `ObjObjectTitleGrp` item with `SortLnu = 1` in all 1000). That fixture carried
+  `ObjObjectTitleClb`, which the export never has. **It has since been replaced
+  by real records** — three Object records, verbatim, with their storage
+  locations redacted — precisely so fixture and reality cannot drift apart
+  again. Count coverage against the module databases, never against the fixture.
 - Fields were chosen by **coverage counted over the real data**, not by name —
   the notes in `oai.toml` carry the counts beside each choice.
 

@@ -441,6 +441,14 @@ namespaces = { lido = "http://www.lido-schema.org" }
 # Multimedia 8533256, so the ranges overlap and one id already appears as both
 # an Object and a Multimedia record).
 #
+# The prefixes are plain `object-` / `person-` / `asset-`. They used to carry an
+# `EM-` (and Object's was `EM-object-`); that was dropped because **it means
+# nothing in this data** — every `__orgUnit` in the export is `KK…`
+# (KK19JhZeichnung, KKBuchmalerei, …), and `EM` occurs nowhere. It was a
+# leftover from the old MPX convention, not an institution tag. Changing a
+# prefix re-identifies every record (a harvester sees new ones and the old
+# identifiers vanish), so it was done while nothing was harvesting yet.
+#
 # `name` is the module name exactly as the dump spells it (module/@name).
 
 [[modules]]
@@ -459,11 +467,11 @@ xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId=
 [[modules]]
 name = "Person"
 database = "sync_Person"
-identifierPrefix = "spk-berlin.de:EM-person-"
+identifierPrefix = "spk-berlin.de:person-"
 
 [[modules]]
 name = "Multimedia"
 database = "sync_Multimedia"
-identifierPrefix = "spk-berlin.de:EM-asset-"
+identifierPrefix = "spk-berlin.de:asset-"
 
 
