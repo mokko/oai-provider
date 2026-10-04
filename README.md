@@ -168,6 +168,8 @@ by **Tim Brody** that ships with HTTP::OAI
   and every gotcha that cost a round trip. Read it before changing anything.
 - **`oai.toml`** — the mapping itself, with the data-coverage counts behind
   each Dublin Core choice.
+- **`ZETCOM-FIELDS.md`** — what the Zetcom field/element names mean, in English
+  and German, plus the naming grammar.
 - **`todo/`** — decisions taken but deliberately not built, and the open
   questions: the index proposal (gated on a benchmark), the nginx
   reverse-proxy question, and deleted-record/tombstone handling (blocked on
