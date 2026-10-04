@@ -410,8 +410,11 @@ class QueryBuilder:
                 # document), so the module list hangs directly off it - one
                 # level shallower than in the recipe, whose $input was a
                 # document node.
-                "let $targets := $input/z:modules"
-                "/z:module[@name='Object']/z:moduleItem\n"
+                # The input was built with the prefix `_zetcom_prefix` chose, so
+                # the prune must use the same one - a hardcoded `z:` would match
+                # nothing if the format binds RIA to another prefix.
+                f"let $targets := $input/{p}:modules"
+                f"/{p}:module[@name='Object']/{p}:moduleItem\n"
                 "let $online := map:merge(\n"
                 "  for $m in $targets where local:isOnline($m)\n"
                 "  return map:entry(string($m/@id), true()))\n"

@@ -166,6 +166,24 @@ def test_the_world_is_rebuilt_from_all_the_databases(config: Config) -> None:
     assert "ObjObjectCre" in expr
 
 
+def test_the_related_works_prune_follows_the_ria_prefix(config: Config) -> None:
+    """The transform input is namespaced with the prefix the format chose, so the
+    prune must use the same one - a hardcoded `z:` would silently target nothing
+    if RIA were bound to another prefix."""
+    fmt = next(f for f in config.formats if f.prefix == "lido")
+    qb = QueryBuilder(config.modules, config.timezone_offset)
+    reb = dataclasses.replace(
+        fmt,
+        namespaces={
+            **fmt.namespaces,
+            "ria": "http://www.zetcom.com/ria/ws/module",
+        },
+    )
+    expr = qb.payload_expr(reb)
+    assert "$input/ria:modules/ria:module[@name='Object']/ria:moduleItem" in expr
+    assert "$input/z:modules" not in expr
+
+
 # -- the round trip -------------------------------------------------------
 
 
