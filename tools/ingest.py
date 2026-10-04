@@ -82,12 +82,20 @@ async def run(args: argparse.Namespace) -> int:
             present = report.get("present") == "true"
             items = int(report.get("items", "0"))
             with_id = int(report.get("withId", "0"))
+            undated = int(report.get("undated", "0"))
             declared = report.get("declared", "")
             print(
                 f"{module.name}: {items} record(s) "
                 f"(server declared {declared or '?'}), {with_id} with an id "
                 f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
             )
+            if undated:
+                print(
+                    f"  warning: {undated} {module.name} record(s) have no usable "
+                    "__lastModified and will NOT be served - OAI requires a "
+                    "datestamp, and the serve query drops what has none",
+                    file=sys.stderr,
+                )
             # A module this dump does not carry is not an error: leave its
             # database alone and carry on with the modules that are here.
             if not present:

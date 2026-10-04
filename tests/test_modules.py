@@ -134,6 +134,11 @@ def test_module_count_is_read_only(config: Config) -> None:
     q = QueryBuilder(config.modules, config.timezone_offset).module_count_query()
     assert "db:put" not in q
     assert "totalSize" in q
+    # it also reports how many records will get no datestamp, so a record the
+    # serve query silently drops is visible. castable, not a try/instance-of:
+    # the latter is answered from the static type and never evaluates.
+    assert "undated" in q
+    assert "castable as xs:dateTime" in q
 
 
 # -- integration ----------------------------------------------------------
@@ -200,6 +205,33 @@ def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> N
     assert count == "3"
     assert uris == ""  # namespaces are gone
     assert value, "the ingested records should carry an object number"
+
+
+def test_the_count_reports_records_without_a_usable_datestamp(live: Config, tmp_path) -> None:
+    """A record the serve query cannot datestamp is dropped from the repository
+    silently; the count pass must surface it, or an operator never learns."""
+    dump = tmp_path / "chunk.xml"
+    dump.write_text(
+        '<application><modules><module name="Object" totalSize="3">'
+        '<moduleItem id="1"><systemField name="__lastModified">'
+        "<value>2026-01-02 10:00:00.0</value></systemField></moduleItem>"
+        '<moduleItem id="2"><systemField name="__lastModified">'
+        "<value>not-a-date</value></systemField></moduleItem>"
+        '<moduleItem id="3"/>'
+        "</module></modules></application>",
+        encoding="utf-8",
+    )
+    builder = QueryBuilder(live.modules, live.timezone_offset)
+
+    async def report(bx: BaseXClient):
+        return await bx.query_xml(
+            builder.module_count_query(), path=str(dump), moduleName="Object"
+        )
+
+    got = _run(live, report)
+    assert got is not None
+    assert got.get("items") == "3"
+    assert got.get("undated") == "2"  # the malformed one and the missing one
 
 
 # -- the six verbs over the module databases ------------------------------
