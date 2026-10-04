@@ -146,6 +146,12 @@ byte-identical either way — and off by default (compact is the wire format).
 ./.venv/bin/python -m pytest tests/ -q   # the BaseX-backed ones skip if it's down
 ```
 
+Responses are also checked for **schema conformance**, not just well-formedness:
+`tests/test_schema_conformance.py` validates them against the vendored
+`OAI-PMH.xsd` (plus `oai_dc`, the DCMI simple-DC schema, and Zetcom's
+`module_1_6.xsd`), using `xmlschema` — pure Python, from the `dev` extra. See
+`data/SOURCES.md` for where each schema came from.
+
 `tools/oai_browser.py` is a small interactive client for poking a running
 provider:
 

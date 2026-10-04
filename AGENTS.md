@@ -186,6 +186,41 @@ noRecordsMatch, badResumptionToken, noSetHierarchy.
   checked by hand and `test_records_are_wrapped_as_the_schema_requires` landed.
   The builder branches once on `with_payload` rather than duplicating the loop.
 
+## Schema conformance, and how the payloads differ
+
+`tests/test_schema_conformance.py` validates served responses against the
+**vendored, unmodified** schemas (`data/SOURCES.md` has provenance and hashes),
+using `xmlschema` — pure Python, so no compiler is needed anywhere the suite
+runs. **Not lxml**, deliberately.
+
+`<metadata>` is `<any namespace="##other" processContents="strict"/>`, so a
+strict processor must find a **global** element declaration for the payload, and
+that is what makes the formats differ:
+
+- **`oai_dc`** — `oai_dc:dc` is global, so the whole document validates strictly.
+- **`ria`** — Zetcom's schema declares exactly one global element, `application`;
+  `moduleItem` is a **local** element, so no strict processor can resolve it.
+  The envelope is validated with that one wildcard relaxed, and the payload is
+  validated separately inside the `application/modules/module` skeleton the
+  schema declares — the same shape the ingest stores. Relaxing the wildcard is
+  not a free pass; it is used only where nothing could resolve, and that payload
+  is validated anyway.
+- **`lido`** — envelope only: `xmlschema` cannot load LIDO 1.0's schema at all
+  (a 2001-era `xml.xsd` import at a dead-shaped URL, GML imported over plain
+  http, and an illegal GML-derived restriction it refuses outright). lxml *does*
+  compile it, given a local `xml.xsd` and something for GML — a 3-element stub is
+  enough, because the schema references only `gml:Point`, `gml:LineString` and
+  `gml:Polygon`, and our LIDO output contains none of them. Recorded, not used.
+
+**Zetcom does have a schema** — `data/zetcom/module_1_6.xsd`, self-contained,
+`targetNamespace="http://www.zetcom.com/ria/ws/module"`, taken from
+**github.com/mokko/MpApi** (`src/mpapi/data/xsd/module_1_6.xsd`, **GPL-3.0** —
+settle that licence question deliberately; see `data/SOURCES.md`). Zetcom
+publishes none and the dump names none, which is why a `ria` payload looked
+unvalidatable for so long. Our served payload passes it, which also proves the
+serve-time re-namespacing is right: the schema is
+`elementFormDefault="qualified"`, so a stripped payload could not pass.
+
 ## Resumption tokens
 
 Stateless and signed, so a restart cannot invalidate a harvest in progress —
