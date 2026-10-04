@@ -63,6 +63,18 @@ class ConfigError(Exception):
 # public, so they must never protect a repository reachable off-host.
 PLACEHOLDER_SECRETS = frozenset({"devpass", "dev-token-secret-change-me"})
 
+# Config-value shapes that are checked at load. A wrong value here does not
+# raise at request time - it produces an empty repository or an unreachable
+# repository with no error - so it is caught before the server starts.
+_OFFSET_RE = re.compile(r"^([+-])(\d{2}):(\d{2})$")
+_TS_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TS_SEC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# A page larger than this is refused: it is a response-size bound, not a
+# protocol limit (OAI has none).
+PAGE_SIZE_MAX = 1000
+
 
 def _host_is_loopback(base_url: str) -> bool:
     host = (urlsplit(base_url).hostname or "").lower()
@@ -118,6 +130,25 @@ class Identity:
             "YYYY-MM-DDThh:mm:ssZ",
         }:
             raise ConfigError(f"unsupported granularity {self.granularity!r}")
+        # baseURL is echoed by Identify and then dialled by harvesters, so a
+        # malformed one is unreachable rather than merely wrong. (It also has to
+        # parse for the off-host placeholder guard to see its host at all.)
+        parts = urlsplit(self.base_url)
+        if parts.scheme not in {"http", "https"} or not parts.hostname:
+            raise ConfigError(
+                f"baseURL {self.base_url!r} must be an absolute http(s) URL"
+            )
+        if not _EMAIL_RE.match(self.admin_email):
+            raise ConfigError(
+                f"adminEmail {self.admin_email!r} is not a valid address"
+            )
+        # earliestDatestamp must fit the granularity the repository advertises.
+        want = _TS_DAY_RE if self.granularity == "YYYY-MM-DD" else _TS_SEC_RE
+        if not want.match(self.earliest_datestamp):
+            raise ConfigError(
+                f"earliestDatestamp {self.earliest_datestamp!r} is not a valid "
+                f"datestamp for granularity {self.granularity!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -173,6 +204,22 @@ class ProtocolSettings:
     # formats inside <metadata>, whose content is served verbatim, so enabling
     # it cannot change a payload. Off by default - compact is the wire format.
     pretty: bool = False
+
+    def __post_init__(self) -> None:
+        if self.page_size < 1:
+            raise ConfigError("protocol.pageSize must be >= 1")
+        if self.page_size > PAGE_SIZE_MAX:
+            raise ConfigError(
+                f"protocol.pageSize {self.page_size} exceeds the cap "
+                f"{PAGE_SIZE_MAX}"
+            )
+        # 0 is deliberate "no expiry"; a negative TTL expires every token the
+        # moment it is issued, which reads as a broken harvester rather than a
+        # config typo.
+        if self.token_ttl < 0:
+            raise ConfigError(
+                "protocol.tokenTTL must be >= 0 (0 means tokens do not expire)"
+            )
 
 
 @dataclass(frozen=True)
@@ -524,6 +571,19 @@ class Config:
         timezone_offset = raw.get("datestamps", {}).get(
             "timezoneOffset", "+00:00"
         )
+        # A bad offset does not raise at request time: every datestamp comes out
+        # empty and the whole repository is served as if it held nothing. Caught
+        # here, where it names the reason.
+        offset = _OFFSET_RE.match(str(timezone_offset))
+        if (
+            not offset
+            or int(offset.group(3)) > 59
+            or int(offset.group(2)) > 14
+        ):
+            raise ConfigError(
+                f"datestamps.timezoneOffset {timezone_offset!r} must be "
+                "±HH:MM within ±14:00 (e.g. '+02:00')"
+            )
 
         proto_raw = raw.get("protocol", {})
         secret_env = os.environ.get("OAI_TOKEN_SECRET")
@@ -535,8 +595,6 @@ class Config:
             from_env=bool(secret_env),
             pretty=bool(proto_raw.get("prettyPrint", False)),
         )
-        if protocol.page_size < 1:
-            raise ConfigError("protocol.pageSize must be >= 1")
 
         formats = tuple(
             MetadataFormat(

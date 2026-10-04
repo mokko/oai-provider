@@ -128,3 +128,64 @@ def test_real_secrets_allow_an_offhost_baseurl(monkeypatch) -> None:
     monkeypatch.setenv("OAI_TOKEN_SECRET", "a-real-token-secret")
     cfg = Config.load(ROOT / "oai.toml")
     assert cfg.identity.base_url == "https://museum.example.org/oai"
+
+
+# -- config-value shape checks ---------------------------------------------
+
+
+def _mutated(tmp_path, old: str, new: str) -> Path:
+    text = (ROOT / "oai.toml").read_text().replace(old, new)
+    bad = tmp_path / "bad.toml"
+    bad.write_text(text)
+    return bad
+
+
+def test_a_bad_timezone_offset_is_rejected(tmp_path) -> None:
+    """A wrong offset does not error at request time: every datestamp comes out
+    empty and the repository serves nothing. Caught at load instead."""
+    bad = _mutated(
+        tmp_path, 'timezoneOffset = "+02:00"', 'timezoneOffset = "+99:99"'
+    )
+    with pytest.raises(ConfigError, match="timezoneOffset"):
+        Config.load(bad)
+
+
+def test_a_bad_earliest_datestamp_is_rejected(tmp_path) -> None:
+    bad = _mutated(
+        tmp_path,
+        'earliestDatestamp = "1970-01-01T00:00:00Z"',
+        'earliestDatestamp = "yesterday"',
+    )
+    with pytest.raises(ConfigError, match="earliestDatestamp"):
+        Config.load(bad)
+
+
+def test_a_malformed_baseurl_is_rejected(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("OAI_BASE_URL", raising=False)
+    bad = _mutated(
+        tmp_path,
+        'baseURL = "http://localhost:8000/oai"',
+        'baseURL = "localhost:8000/oai"',
+    )
+    with pytest.raises(ConfigError, match="baseURL"):
+        Config.load(bad)
+
+
+def test_a_bad_admin_email_is_rejected(tmp_path) -> None:
+    bad = _mutated(
+        tmp_path, 'adminEmail = "mauricemengel@gmail.com"', 'adminEmail = "nope"'
+    )
+    with pytest.raises(ConfigError, match="adminEmail"):
+        Config.load(bad)
+
+
+def test_a_negative_token_ttl_is_rejected(tmp_path) -> None:
+    bad = _mutated(tmp_path, "tokenTTL = 86400", "tokenTTL = -1")
+    with pytest.raises(ConfigError, match="tokenTTL"):
+        Config.load(bad)
+
+
+def test_an_oversized_page_is_rejected(tmp_path) -> None:
+    bad = _mutated(tmp_path, "pageSize = 100", "pageSize = 100000")
+    with pytest.raises(ConfigError, match="pageSize"):
+        Config.load(bad)
