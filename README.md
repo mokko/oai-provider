@@ -151,5 +151,5 @@ repository. Loopback (the default) keeps the dev values working.
   and every gotcha that cost a round trip. Read it before changing anything.
 - **`oai.toml`** — the mapping itself, with the data-coverage counts behind
   each Dublin Core choice.
-- **`todo/`** — decisions taken but deliberately not built (the index
-  proposal, gated on a benchmark).
+- **`todo/`** — decisions taken but deliberately not built: the index proposal
+  (gated on a benchmark) and the nginx reverse-proxy question.
