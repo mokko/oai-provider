@@ -120,6 +120,12 @@ def test_lido_pages_objects_only(config: Config) -> None:
     assert src.count("<row ") == 1, "only one module's rows"
     assert "sync_Object" in src
     assert "sync_Person" not in src
+    # and the payload phase must agree with the source phase - it is the same
+    # subset, so only Object gets a payload block (its transform still reaches
+    # into the other databases to reassemble the record's world - that is inside
+    # the one block, not a second block)
+    pay = qb.payload_expr(fmt)
+    assert pay.count("xslt:transform(") == 1, "only one module's payload"
     # while the unrestricted formats span everything
     assert qb.source_expr().count("<row ") == 3
 

@@ -219,7 +219,9 @@ class QueryBuilder:
         format (oai_dc) is built here rather than in the source, so it too is
         assembled only for what is served.
         """
-        blocks = ",\n".join(self._module_payload(m, fmt) for m in self.modules)
+        blocks = ",\n".join(
+            self._module_payload(m, fmt) for m in self.modules_for(fmt)
+        )
         return f"(\n{blocks}\n)"
 
     def terms_for(self, module, fmt) -> tuple:
