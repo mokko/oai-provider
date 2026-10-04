@@ -6,9 +6,12 @@
    its own prefix (object-, person-, asset-), so a search across all
    sources finds exactly one - the caller need not know which database holds it.
 
-   Same split as paging: {{SOURCE}} gives the header, {{PAYLOADS}} attaches the
-   payload for the record asked for. A derived format (oai_dc) is built there
-   too, so it is assembled for the record actually served.
+   Same split as paging: SOURCE gives the header, PAYLOADS attaches the payload
+   for the record asked for. A derived format (oai_dc) is built there too, so it
+   is assembled for the record actually served.
+
+   (Placeholders are plain words here on purpose - the renderer substitutes every
+   double-brace placeholder, comments included.)
 :)
 {{NAMESPACES}}
 {{FORMAT_NAMESPACES}}

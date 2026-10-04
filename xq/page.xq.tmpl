@@ -10,12 +10,16 @@
    $until is pinned on the first page and carried in the resumption token, so
    a re-ingest during a harvest cannot move a record across a page boundary.
 
-   **The payload is fetched after the page is chosen, not before.** {{SOURCE}}
-   yields headers only, so the order-by sorts rows it can afford to carry, and
-   only the page's rows get a payload attached, from {{PAYLOADS}}. Attaching
-   payloads in the source and then sorting them was the whole cost of
+   **The payload is fetched after the page is chosen, not before.** The SOURCE
+   expression yields headers only, so the order-by sorts rows it can afford to
+   carry, and only the page's rows get a payload attached, from PAYLOADS.
+   Attaching payloads in the source and then sorting them was the whole cost of
    ListRecords: page_size=1 and page_size=100 measured the same, because all
    5,884 matching records were materialised and then discarded.
+
+   (Placeholders are written as plain words in this comment on purpose: the
+   renderer substitutes every double-brace placeholder, comments included, so
+   naming one here would splice a full expression into the comment.)
 :)
 {{NAMESPACES}}
 {{FORMAT_NAMESPACES}}
