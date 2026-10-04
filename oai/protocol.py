@@ -27,7 +27,18 @@ from .mapping import QueryBuilder
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
+OAI_DC_NS = "http://www.openarchives.org/OAI/2.0/oai_dc/"
 TOKEN_VERSION = 1
+
+# A namespace prefix is arbitrary - the *URI* is what the spec fixes - so the
+# `ns0:` ElementTree invents is conformant. It is still worth avoiding: our own
+# elements come out as ns0/ns1 because OAI's namespace is not in ElementTree's
+# "well-known" map (while `dc` and `xsi` are, which is why those already looked
+# right), whereas the spec's examples and harvesters' expectations use `oai:`.
+# Registering changes only how our elements are written out, never the
+# namespace they are in.
+ET.register_namespace("oai", OAI_NS)
+ET.register_namespace("oai_dc", OAI_DC_NS)
 
 VERBS = (
     "Identify",

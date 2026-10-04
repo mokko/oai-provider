@@ -214,6 +214,23 @@ def test_an_illegal_argument_name_keeps_the_response_well_formed() -> None:
     assert "spk-berlin.de:object-851035" in exc.value.message
 
 
+def test_the_response_uses_the_conventional_oai_prefix() -> None:
+    """The prefix is arbitrary - the URI is what the spec fixes - but
+    ElementTree invents `ns0` for OAI's namespace unless it is registered, and
+    the spec's examples (and harvesters' expectations) use `oai:`."""
+    from xml.etree import ElementTree as ET
+
+    from oai.protocol import q, serialise
+
+    root = ET.Element(q("OAI-PMH"))
+    ET.SubElement(root, q("Identify"))
+    body = serialise(root).decode()
+
+    assert "<oai:OAI-PMH" in body
+    assert 'xmlns:oai="http://www.openarchives.org/OAI/2.0/"' in body
+    assert "ns0:" not in body
+
+
 def test_tampered_token_is_rejected() -> None:
     token = encode_token(state(), SECRET)
     body, _, sig = token.partition(".")
