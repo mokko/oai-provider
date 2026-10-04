@@ -3,7 +3,8 @@
 An OAI-PMH data provider backend written in Python. With BaseX as the store,
 generic MuseumPlus RIA XML goes in and the six OAI verbs come out. We are
 providing several on-the-fly metadata formats like Dublin Core and Lido. Work
-in progress. Nothing particularly well tested at this time.
+in progress. Nothing particularly well tested at this time. Written with
+hermes-agent and deepseek-v4.1 flash.
 
 ## Shape
 
