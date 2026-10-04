@@ -43,7 +43,54 @@ curl 'http://localhost:8000/oai?verb=Identify'
 
 `oai.toml` holds the identity, the XPath mapping, the set allow-list, the
 metadata formats, and one `[[modules]]` block per MuseumPlus module. Each field
-carries a comment saying why it is what it is.
+carries a comment saying why it is what it is. A trimmed example:
+
+```toml
+[identity]
+repositoryName = "Museum collection (OAI provider recreation)"
+baseURL = "http://localhost:8000/oai"   # overridden by OAI_BASE_URL
+deletedRecord = "no"                    # module mode cannot serve deletions
+
+[basex]
+url = "http://localhost:8080/rest"
+user = "oai"                            # password from OAI_BASEX_PASSWORD
+
+[mapping]
+namespaces = { m = "http://www.zetcom.com/ria/ws/module" }
+records = "/m:application/m:modules/m:module[@name='Object']/m:moduleItem"
+identifier = "@id"
+datestamp = "m:systemField[@name='__lastModified']/m:value"
+timezoneOffset = "+02:00"               # source is local wall clock -> UTC
+
+# sets are an explicit allow-list; the setSpec is chosen by hand
+[[mapping.sets]]
+spec = "mimo"
+label = "Musikinstrumente"
+xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
+
+[protocol]
+pageSize = 100
+tokenTTL = 86400
+
+# formats: passthrough (verbatim) | derived (assembled) | xslt (stylesheet)
+[[metadata.formats]]
+prefix = "ria"
+namespace = "http://www.zetcom.com/ria/ws/module"
+kind = "passthrough"
+
+# module mode: one database per module, where the Dublin Core terms live
+[[modules]]
+name = "Object"
+database = "sync_Object"
+identifierPrefix = "spk-berlin.de:EM-object-"
+
+[[modules.terms]]
+term = "dc:type"
+xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
+```
+
+The real file configures all three formats (`ria`, `oai_dc`, `lido`) and all
+three modules; see `oai.toml` and `AGENTS.md`.
 
 Deployment values come from the environment, not the tracked file:
 `OAI_BASE_URL`, `OAI_BASEX_PASSWORD`, `OAI_TOKEN_SECRET` — a real variable, or
