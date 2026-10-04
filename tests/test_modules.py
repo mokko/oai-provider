@@ -237,6 +237,30 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
         <dataField dataType="Varchar" name="PerNameTxt">
           <value>Doe, Jane</value>
         </dataField>
+        <repeatableGroup name="PerDateGrp" size="2">
+          <repeatableGroupItem id="9001">
+            <dataField dataType="Long" name="SortingLnu">
+              <value>1</value>
+            </dataField>
+            <dataField dataType="Varchar" name="DatingNewTxt">
+              <value>1900 - 1970</value>
+            </dataField>
+            <dataField dataType="Clob" name="NotesClb">
+              <value>anderslt. Todesjahr 1971</value>
+            </dataField>
+          </repeatableGroupItem>
+          <repeatableGroupItem id="9002">
+            <dataField dataType="Long" name="SortingLnu">
+              <value>5</value>
+            </dataField>
+            <dataField dataType="Varchar" name="DatingNewTxt">
+              <value>1930 - 1935</value>
+            </dataField>
+            <dataField dataType="Clob" name="NotesClb">
+              <value>Berlin</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
       </moduleItem>
     </module>
   </modules>
@@ -335,6 +359,24 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     z = "{http://www.zetcom.com/ria/ws/module}"
     name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
     assert name is not None and name.text == "Doe, Jane"
+
+
+def test_a_person_gets_life_dates_but_not_a_residence(module_config: Config) -> None:
+    """dc:date for a Person is the PerDateGrp entry with `SortingLnu = 1`, and
+    **not** filtered on NotesClb. The fixture pins both halves: the primary entry
+    carries a note ("anderslt. Todesjahr 1971") and must still be served, while a
+    residence in Berlin at SortingLnu = 5 must not be — excluded because it is
+    not the primary, not because it has a note."""
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:EM-person-77"),
+        ("metadataPrefix", "oai_dc"),
+    )
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
+    assert md is not None, "no metadata served"
+    dates = [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "date"]
+    assert dates == ["1900 - 1970"], dates
 
 
 def test_module_set_filters_on_the_envelope_free_rows(module_config: Config) -> None:

@@ -180,6 +180,31 @@ module = "Person"
 term = "dc:title"
 xpath = "//dataField[@name='PerNennformTxt']/value"
 
+# Life dates. A Person has no `...Vrt` date field the way an Object does
+# (ObjDateVrt), so this reads the museum's own formatted dating out of
+# PerDateGrp — but that group is **dated events, not a date list**: it holds
+# residences, acquisitions ("Erwerbungsvorgang (EM)"), burials ("Beerdigung")
+# and activity periods, so mapping it naively emits up to 12 dc:date values per
+# person, most of them not life dates.
+#
+# `SortingLnu = 1` is the primary entry — the museum's own convention, as with
+# ObjObjectTitleGrp. That is 432 primary entries, giving a date for 418 of the
+# 652 persons (64%).
+#
+# **Do not filter on NotesClb.** It looks like a discriminator and is not: the
+# field carries date *qualifiers* and sources ("1910 anderslt. Todesjahr",
+# "abw. Geburtsjahr ca. 1485 (lt. GND)", "Quelle: Metzger 2002", "PND") about as
+# often as it carries a place. Only 17 of the 432 primary entries have a note at
+# all, and most are legitimate life dates — filtering on it silently dropped
+# Hugo von Tschudi's own dates. One of the 17 is an activity period, which is
+# the accepted cost of not losing the other 16.
+#
+# A person with no primary dating gets no dc:date, rather than a residence.
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:date"
+xpath = "//repeatableGroup[@name='PerDateGrp']/repeatableGroupItem[dataField[@name='SortingLnu']/value = '1']/dataField[@name='DatingNewTxt']/value"
+
 [[metadata.formats.terms]]
 module = "Person"
 term = "dc:subject"

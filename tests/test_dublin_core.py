@@ -355,6 +355,23 @@ def test_the_object_title_is_the_virtual_field(config: Config) -> None:
     assert titles[0].xpath == "//virtualField[@name='ObjObjectTitleVrt']/value"
 
 
+def test_the_person_date_is_the_primary_dated_entry(config: Config) -> None:
+    """`PerDateGrp` is dated *events*, not a date list — residences, acquisitions,
+    burials — so `dc:date` takes the `SortingLnu = 1` entry only, where the naive
+    path would serve up to 12 values per person.
+
+    It is deliberately **not** filtered on `NotesClb`: that field carries date
+    qualifiers and sources ("1910 anderslt. Todesjahr", "Quelle: Metzger 2002")
+    about as often as it carries a place, and filtering on it dropped real life
+    dates."""
+    fmt = next(f for f in config.formats if f.prefix == "oai_dc")
+    dates = [t for t in fmt.terms if t.term == "dc:date" and t.module == "Person"]
+    assert len(dates) == 1, dates
+    assert "PerDateGrp" in dates[0].xpath
+    assert "SortingLnu" in dates[0].xpath
+    assert "NotesClb" not in dates[0].xpath, "NotesClb is not a discriminator"
+
+
 def test_every_record_on_a_real_page_serves_a_title(live: Config) -> None:
     """End to end against the module databases: the export titles every object,
     so no record on a page may come back without a dc:title. The fixture cannot
