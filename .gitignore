@@ -11,3 +11,11 @@ __pycache__/
 # ours to publish, so **nothing in here is ever committed or pushed**. The
 # directory is expected to exist locally and to stay out of git entirely.
 sdata/
+
+# `uv pip install` run inside the project directory writes a lockfile as a side
+# effect. Nothing depends on it, this project pins nothing, and the documented
+# workflow is `uv pip install --python ./.venv/bin/python ...` - so it is noise
+# here rather than a dependency decision. Ignored; delete this rule if a lock is
+# ever wanted deliberately (then commit it on purpose).
+uv.lock
+
