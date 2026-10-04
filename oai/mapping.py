@@ -255,17 +255,18 @@ class QueryBuilder:
         # element, so a payload rooted at it is not the record and does not
         # resolve in Zetcom's schema. Serve the whole document.
         #
-        # `totalSize` is corrected to the number of records this document
-        # actually holds - the store keeps ONE record per document, so that is
-        # 1, not the source file's count the ingest copied. Left absent if the
-        # store does not carry the attribute (absent is honest; wrong is not).
+        # `totalSize` is the number of records THIS document holds - the store
+        # keeps one record per document, so 1, not the source file's count. It
+        # is the single site: ingest does not copy it. Always written, so a
+        # document carries a truthful total whether or not the store had one.
         if fmt is None or fmt.kind == "passthrough":
             body = (
                 "local:zetcom("
                 "copy $app := $src/ancestor::application "
-                "modify (for $m in $app/modules/module return "
-                "if ($m/@totalSize) then replace value of node $m/@totalSize "
-                "with string(count($app//moduleItem)) else ()) "
+                "modify (for $m in $app/modules/module return ("
+                "delete node $m/@totalSize, "
+                "insert node attribute totalSize "
+                "{ string(count($app//moduleItem)) } into $m)) "
                 "return $app)"
             )
         else:

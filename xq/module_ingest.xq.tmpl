@@ -38,9 +38,14 @@ let $doc := parse-xml(file:read-text($path))
 (: *:name so this works whether or not the dump still carries its namespace -
    the same query serves both dialects, which is the point of stripping. :)
 let $module := $doc/*:application/*:modules/*:module[@name = $moduleName]
-(: The module's own attributes (@name, @totalSize) are carried onto the stored
-   module element, so the wrapper says which module it is. :)
-let $header := (for $a in $module/@* return attribute { local-name($a) } { string($a) })
+(: The module's own attributes are carried onto the stored module element, so
+   the wrapper says which module it is - but NOT @totalSize: that describes the
+   whole dump, not this one-record document. The serve path writes the
+   document's own record count there instead, so there is a single site. :)
+let $header := (
+  for $a in $module/@*[local-name() ne 'totalSize']
+  return attribute { local-name($a) } { string($a) }
+)
 
 for $item in $module/*:moduleItem
 let $id := string($item/@id)

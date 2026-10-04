@@ -123,6 +123,11 @@ def test_module_ingest_writes_the_colleague_path(config: Config) -> None:
     assert "element application" in q
     assert "element modules" in q
     assert "element module" in q
+    # @name is carried (it is what records_xpath() matches and the colleague's
+    # layout carries), but the dump's @totalSize is NOT copied - the serve path
+    # writes the document's own record count, so there is a single site.
+    assert "local-name($a)" in q
+    assert "'totalSize'" in q and "ne 'totalSize'" in q
 
 
 def test_module_count_is_read_only(config: Config) -> None:
