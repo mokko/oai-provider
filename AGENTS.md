@@ -266,26 +266,44 @@ xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
 
 ## Sets
 
-Sets are an **explicit allow-list** (`[[mapping.sets]]`). Each entry pairs an
-XPath with a string label:
+Sets are an **explicit allow-list**. Each entry pairs an XPath (a membership
+predicate; its value is ignored) with a hand-written `spec` and `label`. **Which
+table holds them depends on the storage mode**: `[[mapping.sets]]` for the
+enveloped path, `[[modules.sets]]` for module mode (the deployment path). A set
+declared in the wrong one is silently inert — which is why `ListSets` returned
+`noSetHierarchy` until the entry below landed under `[[modules.sets]]`.
 
 ```toml
-[[mapping.sets]]
-spec  = "mimo"                 # setSpec published to harvesters
-label = "Musikinstrumente"     # setName shown by ListSets
-xpath = "m:moduleReference[@name='ObjObjectGroupsRef']/m:moduleReferenceItem[@moduleItemId='6054']"
+# module mode - the real set. "KK" is our internal label for the
+# Kupferstichkabinett; the holder is the Address moduleItem the records carry.
+[[modules.sets]]
+spec  = "KK"                    # setSpec published to harvesters
+label = "Kupferstichkabinett, Staatliche Museen zu Berlin"   # setName
+xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId='112264']"
 ```
 
 A record is in the set when its XPath selects anything; value tests belong
-inside the XPath (`m:dataField[@name='X'][m:value='Y']`).
+inside the XPath (`dataField[@name='X'][value='Y']` — module records are
+namespace-stripped, so no prefixes). Verified: `set=KK` → 1000 (the Object
+records), no set → 5884, and an unknown spec is `noRecordsMatch`, not silence.
 
-Two consequences worth being deliberate about:
+Consequences worth being deliberate about:
 
 - **The setSpec is written by hand and never taken from a record.** No
   internal group id or organisational unit can reach OAI output by accident,
-  and a group that is not listed here is not harvestable at all.
+  and a group that is not listed is not harvestable at all.
 - `__orgUnit` is an organisational unit, not a set, and is not published as
   one.
+- **Pick the set field by surveying the real data, not by its name.** Two
+  obvious candidates are traps here: `ObjOwnerRef` carries a *single* value
+  across all 1000 objects (so the set equals the whole repository — fine only
+  while one department is imported), and `ObjObjectGroupsRef`'s ~100 groups are
+  internal working labels (`KK_Priorisierung 1`, `KK_Diskriminierende Titel
+  prüfen`, "nochmal checken für Flamen") that must never be published wholesale.
+  The clean hierarchy, if wanted, is `ObjOrgGroupVoc` (16 curatorial
+  collections, 1000/1000 coverage); `ObjPublicationStatusVoc` sounds like a
+  publish flag but is physical status (`vorhanden`, `Kriegsverlust`).
+
 
 ListSets needs no database query — the specs and labels come straight from
 the config, which is what keeps the allow-list authoritative.

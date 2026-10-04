@@ -58,8 +58,11 @@ timezoneOffset = "+02:00"
 # and organisational units therefore cannot reach OAI output by accident,
 # and an internal group that is not listed is not harvestable at all.
 #
-# __orgUnit is an organisational unit, not a set, and must not be published
-# as one. The group ids below are from the synthetic sample file.
+# These entries are the **enveloped** path's sets and are what the enveloped
+# tests exercise; module mode (the deployment path) takes its sets from
+# [[modules.sets]] instead. __orgUnit is an organisational unit, not a set, and
+# must not be published as one. The group ids below are from the synthetic
+# sample file.
 
 [[mapping.sets]]
 spec = "mimo"
@@ -185,6 +188,15 @@ namespaces = { lido = "http://www.lido-schema.org" }
 name = "Object"
 database = "sync_Object"
 identifierPrefix = "spk-berlin.de:EM-object-"
+
+# Sets for this module (module mode reads [[modules.sets]]; the [[mapping.sets]]
+# above applies only to the enveloped path). "KK" is our internal label for the
+# Kupferstichkabinett: the holder is the Address moduleItem the real data carries
+# (1000/1000 objects in this chunk). The label is our own text, never lifted.
+[[modules.sets]]
+spec = "KK"
+label = "Kupferstichkabinett, Staatliche Museen zu Berlin"
+xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId='112264']"
 
 # Dublin Core for an Object. Grounded in what the 1000 real objects actually
 # carry (coverage counted, not assumed): object number 1000/1000, main
