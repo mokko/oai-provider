@@ -129,11 +129,28 @@ config **refuses to start** if `baseURL` is not loopback while either still hold
 the shipped placeholder — a public checkout must never protect a reachable
 repository. Loopback (the default) keeps the dev values working.
 
+`[protocol] prettyPrint = true` indents the response for reading in a browser.
+It is cosmetic — it never formats inside `<metadata>`, so a served payload is
+byte-identical either way — and off by default (compact is the wire format).
+
 ## Test
 
 ```bash
 ./.venv/bin/python -m pytest tests/ -q   # the BaseX-backed ones skip if it's down
 ```
+
+`tools/oai_browser.py` is a small interactive client for poking a running
+provider:
+
+```bash
+python3 tools/oai_browser.py http://localhost:8000/oai
+```
+
+It prompts for a base URL, `Identify`s, then offers the six verbs from a menu
+(`--silent`, `--all` to follow resumption tokens, `--trace`). It is a
+stdlib-only reimplementation of `oai_browser.pl` — the command-line OAI browser
+by **Tim Brody** that ships with HTTP::OAI
+(https://metacpan.org/release/HTTP-OAI/source/script/oai_browser.pl).
 
 ## Status
 

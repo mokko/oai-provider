@@ -21,6 +21,9 @@ that looked correct.
 - `xq/*.xq.tmpl` — the query templates: `ingest`, `validate`, `reconcile`,
   `stale`, `page`, `record`, and the module-mode variants.
 - `tools/ingest.py` — the CLI.
+- `tools/oai_browser.py` — an interactive OAI client (the six verbs from a
+  menu) for testing a running provider; a stdlib reimplementation of HTTP::OAI's
+  `oai_browser.pl` by Tim Brody.
 
 ## Ingest
 
