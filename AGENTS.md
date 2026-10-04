@@ -210,23 +210,35 @@ Three are configured:
   whole thing is handed to the transform. The record never leaves the store.
 
 A derived format is declared with the element to build and the prefixes its
-wrapper and terms use, and its terms are **per module**, because the three
-modules are three different record shapes:
+wrapper and terms use. **Its whole mapping sits in one block under the format**,
+each term naming the module whose records it applies to — the three modules are
+three different record shapes, so a term rarely applies to all of them:
 
 ```toml
 [[metadata.formats]]
 prefix = "oai_dc"
 kind = "derived"
 wrapper = "oai_dc:dc"
-namespaces = { oai_dc = "...", dc = "..." }
+namespaces = { oai_dc = "…", dc = "…" }
 
-[[modules.terms]]         # attached to the last [[modules]] entry
+[[metadata.formats.terms]]
+module = "Object"         # scopes the term; omit it to apply to every module
 term = "dc:type"
 xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
 ```
 
+A module may still carry its own `[[modules.terms]]`, which **overrides** the
+format's rules for those records — that is how a one-off exception is written
+without disturbing the shared block. A `module` key inside `[[modules.terms]]`
+is rejected at load, because the entry is scoped already and the key would
+silently do nothing.
+
 - **A term with no value is omitted, never emitted empty.** That is the whole
   of "correct Dublin Core" here — no blank `dc:date`.
+- **A derived format must cover every module**, or it would disseminate an empty
+  `oai_dc` silently: each module needs module-level terms, a term scoped to it,
+  or an unscoped term. A term naming a module that is not in `[[modules]]` is a
+  load error.
 - **The mapping is authored, not inferred.** Each term is a field the record
   really has, or a literal declared as one (`dc:language = "de"`). Nothing is
   invented: the Object module has no title field in the real export, so there

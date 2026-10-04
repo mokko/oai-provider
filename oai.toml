@@ -76,10 +76,11 @@ kind = "passthrough"
 # of "correct Dublin Core" here: if the record has nothing for dc:date, there is
 # no dc:date - rather than a blank one.
 #
-# The terms are per module, because the three modules are three different
-# record shapes (see [[modules.terms]] below). Nothing here is invented: each
-# element is either a field the record really has, or a literal declared as
-# such (dc:language).
+# **The whole Dublin Core mapping is in this one place.** Each term carries
+# `module`, naming the module whose records it applies to, because the three
+# modules are three different record shapes; a term with no `module` would apply
+# to all of them. Nothing is invented: every term is either a field the record
+# really has, or a literal declared as such (dc:language).
 [[metadata.formats]]
 prefix = "oai_dc"
 namespace = "http://www.openarchives.org/OAI/2.0/oai_dc/"
@@ -87,6 +88,191 @@ schema = "http://www.openarchives.org/OAI/2.0/oai_dc.xsd"
 kind = "derived"
 wrapper = "oai_dc:dc"
 namespaces = { oai_dc = "http://www.openarchives.org/OAI/2.0/oai_dc/", dc = "http://purl.org/dc/elements/1.1/" }
+
+# ---- Object ---------------------------------------------------------------
+# Grounded in what the 1000 real objects actually carry (coverage counted, not
+# assumed): object number 1000/1000, main participant 1000/1000, technical term
+# 999/1000, material/technique 998/1000, date virtual field 863/1000.
+#
+# **There is no title field.** The sample fixture's ObjObjectTitleClb occurs
+# zero times in the real export, so dc:title is deliberately absent rather
+# than filled with something that is not a title.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:identifier"
+xpath = "//dataField[@name='ObjObjectNumberTxt']/value"
+
+# The holding institution ("Verwaltende Institution"). Dublin Core has no
+# institution element; dc:publisher - "an entity responsible for making the
+# resource available" - is the slot harvesters (Europeana, the DDB) read as the
+# data provider. Taken from the record's own owner reference (1000/1000,
+# single-valued) rather than a constant, so it stays right if more than one
+# collection is ever ingested.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:publisher"
+xpath = "//moduleReference[@name='ObjOwnerRef']//formattedValue"
+
+# the main person association, as the museum's own display form ("Opel, Peter")
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:creator"
+xpath = "//virtualField[@name='ObjPerAssociationMainParticipantNameVrt']/value"
+
+# the object's own term, e.g. "Zeichnung"
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:type"
+xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
+
+# e.g. "1587" - the museum's formatted date, not a machine date
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:date"
+xpath = "//virtualField[@name='ObjDateVrt']/value"
+
+# material and technique, e.g. "Feder in Braun, auf ... gezeichnet"
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:format"
+xpath = "//virtualField[@name='ObjMaterialTechniqueVrt']/value"
+
+# subject keywords, from the classification the museum files the object under
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='ObjOrgGroupVoc']//formattedValue"
+
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='MaterialVoc']//formattedValue"
+
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='ObjCategoryVoc']//formattedValue"
+
+# The collection is German; this is a declared constant, not a field.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:language"
+literal = "de"
+
+# ---- Person ---------------------------------------------------------------
+# A Person record: the name is what names it, so the name is the title.
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:title"
+xpath = "//dataField[@name='PerNennformTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:subject"
+xpath = "//vocabularyReference[@name='PerNationalityVoc']//formattedValue"
+
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:description"
+xpath = "//dataField[@name='PerNotesClb']/value"
+
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:source"
+xpath = "//dataField[@name='PerSourceClb']/value"
+
+# The institution, as for Object - but a Person record carries no owner
+# reference of its own, so this is a deployment constant, not data. See the note
+# in AGENTS.md: it is the one value here that is an assumption about the
+# deployment rather than something the record states.
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:publisher"
+literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
+
+[[metadata.formats.terms]]
+module = "Person"
+term = "dc:language"
+literal = "de"
+
+# ---- Multimedia -----------------------------------------------------------
+# A Multimedia record IS an asset, so the fields are the asset's own.
+#
+# Chosen by coverage across the 4232 real assets, not by the field's name:
+# MulOriginalFileTxt 4168/4232, MulSubjectTxt 2186, MulDateTxt 1845,
+# MulReferenceNumberTxt 1120, MulShootingDateDat 884, MulIPTCUrheberTxt 191,
+# MulIPTCObjRefTxt 192, MulIPTCRightsTxt 172, MulTypeTxt 102. The fields that
+# sound right but are nearly empty (MulPhotocreditTxt 33/4232,
+# MulIPTCObjTitleTxt 103) are carried as extras, not as the main source.
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:title"
+xpath = "//dataField[@name='MulOriginalFileTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:title"
+xpath = "//dataField[@name='MulIPTCObjTitleTxt']/value"
+
+# the photographer / rights holder of the image
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:creator"
+xpath = "//dataField[@name='MulIPTCUrheberTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:identifier"
+xpath = "//dataField[@name='MulReferenceNumberTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:type"
+xpath = "//dataField[@name='MulTypeTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:date"
+xpath = "//dataField[@name='MulDateTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:date"
+xpath = "//dataField[@name='MulShootingDateDat']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:description"
+xpath = "//dataField[@name='MulSubjectTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:rights"
+xpath = "//dataField[@name='MulIPTCRightsTxt']/value"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:source"
+xpath = "//dataField[@name='MulPhotocreditTxt']/value"
+
+# the object this asset documents
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:relation"
+xpath = "//dataField[@name='MulIPTCObjRefTxt']/value"
+
+# The institution, as a constant: an asset points at its object through
+# MulObjectRef, but a term's xpath sees only its own record, so the owning
+# collection cannot be joined in here.
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:publisher"
+literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
+
+[[metadata.formats.terms]]
+module = "Multimedia"
+term = "dc:language"
+literal = "de"
 
 # ---------------------------------------------------------------------------
 # LIDO, from the XSLT that already exists (mokko/zml2lido, vendored under
@@ -159,167 +345,14 @@ spec = "KK"
 label = "Kupferstichkabinett, Staatliche Museen zu Berlin"
 xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId='112264']"
 
-# Dublin Core for an Object. Grounded in what the 1000 real objects actually
-# carry (coverage counted, not assumed): object number 1000/1000, main
-# participant 1000/1000, technical term 999/1000, material/technique 998/1000,
-# date virtual field 863/1000.
-#
-# **There is no title field.** The sample fixture's ObjObjectTitleClb occurs
-# zero times in the real export, so dc:title is deliberately absent rather
-# than filled with something that is not a title.
-[[modules.terms]]
-term = "dc:identifier"
-xpath = "//dataField[@name='ObjObjectNumberTxt']/value"
-
-# The holding institution ("Verwaltende Institution"). Dublin Core has no
-# institution element; dc:publisher - "an entity responsible for making the
-# resource available" - is the slot harvesters (Europeana, the DDB) read as the
-# data provider. Taken from the record's own owner reference (1000/1000,
-# single-valued) rather than a constant, so it stays right if more than one
-# collection is ever ingested.
-[[modules.terms]]
-term = "dc:publisher"
-xpath = "//moduleReference[@name='ObjOwnerRef']//formattedValue"
-
-# the main person association, as the museum's own display form ("Opel, Peter")
-[[modules.terms]]
-term = "dc:creator"
-xpath = "//virtualField[@name='ObjPerAssociationMainParticipantNameVrt']/value"
-
-# the object's own term, e.g. "Zeichnung"
-[[modules.terms]]
-term = "dc:type"
-xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
-
-# e.g. "1587" - the museum's formatted date, not a machine date
-[[modules.terms]]
-term = "dc:date"
-xpath = "//virtualField[@name='ObjDateVrt']/value"
-
-# material and technique, e.g. "Feder in Braun, auf ... gezeichnet"
-[[modules.terms]]
-term = "dc:format"
-xpath = "//virtualField[@name='ObjMaterialTechniqueVrt']/value"
-
-# subject keywords, from the classification the museum files the object under
-[[modules.terms]]
-term = "dc:subject"
-xpath = "//vocabularyReference[@name='ObjOrgGroupVoc']//formattedValue"
-
-[[modules.terms]]
-term = "dc:subject"
-xpath = "//vocabularyReference[@name='MaterialVoc']//formattedValue"
-
-[[modules.terms]]
-term = "dc:subject"
-xpath = "//vocabularyReference[@name='ObjCategoryVoc']//formattedValue"
-
-# The collection is German; this is a declared constant, not a field.
-[[modules.terms]]
-term = "dc:language"
-literal = "de"
-
 [[modules]]
 name = "Person"
 database = "sync_Person"
 identifierPrefix = "spk-berlin.de:EM-person-"
-
-# A Person record: the name is what names it, so the name is the title.
-[[modules.terms]]
-term = "dc:title"
-xpath = "//dataField[@name='PerNennformTxt']/value"
-
-[[modules.terms]]
-term = "dc:subject"
-xpath = "//vocabularyReference[@name='PerNationalityVoc']//formattedValue"
-
-[[modules.terms]]
-term = "dc:description"
-xpath = "//dataField[@name='PerNotesClb']/value"
-
-[[modules.terms]]
-term = "dc:source"
-xpath = "//dataField[@name='PerSourceClb']/value"
-
-# The institution, as for Object - but a Person record carries no owner
-# reference of its own, so this is a deployment constant, not data. See the note
-# in AGENTS.md: it is the one value here that is an assumption about the
-# deployment rather than something the record states.
-[[modules.terms]]
-term = "dc:publisher"
-literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
-
-[[modules.terms]]
-term = "dc:language"
-literal = "de"
 
 [[modules]]
 name = "Multimedia"
 database = "sync_Multimedia"
 identifierPrefix = "spk-berlin.de:EM-asset-"
 
-# A Multimedia record IS an asset, so the fields are the asset's own.
-#
-# Chosen by coverage across the 4232 real assets, not by the field's name:
-# MulOriginalFileTxt 4168/4232, MulSubjectTxt 2186, MulDateTxt 1845,
-# MulReferenceNumberTxt 1120, MulShootingDateDat 884, MulIPTCUrheberTxt 191,
-# MulIPTCObjRefTxt 192, MulIPTCRightsTxt 172, MulTypeTxt 102. The fields that
-# sound right but are nearly empty (MulPhotocreditTxt 33/4232,
-# MulIPTCObjTitleTxt 103) are carried as extras, not as the main source.
-[[modules.terms]]
-term = "dc:title"
-xpath = "//dataField[@name='MulOriginalFileTxt']/value"
-
-[[modules.terms]]
-term = "dc:title"
-xpath = "//dataField[@name='MulIPTCObjTitleTxt']/value"
-
-# the photographer / rights holder of the image
-[[modules.terms]]
-term = "dc:creator"
-xpath = "//dataField[@name='MulIPTCUrheberTxt']/value"
-
-[[modules.terms]]
-term = "dc:identifier"
-xpath = "//dataField[@name='MulReferenceNumberTxt']/value"
-
-[[modules.terms]]
-term = "dc:type"
-xpath = "//dataField[@name='MulTypeTxt']/value"
-
-[[modules.terms]]
-term = "dc:date"
-xpath = "//dataField[@name='MulDateTxt']/value"
-
-[[modules.terms]]
-term = "dc:date"
-xpath = "//dataField[@name='MulShootingDateDat']/value"
-
-[[modules.terms]]
-term = "dc:description"
-xpath = "//dataField[@name='MulSubjectTxt']/value"
-
-[[modules.terms]]
-term = "dc:rights"
-xpath = "//dataField[@name='MulIPTCRightsTxt']/value"
-
-[[modules.terms]]
-term = "dc:source"
-xpath = "//dataField[@name='MulPhotocreditTxt']/value"
-
-# the object this asset documents
-[[modules.terms]]
-term = "dc:relation"
-xpath = "//dataField[@name='MulIPTCObjRefTxt']/value"
-
-# The institution, as a constant: an asset points at its object through
-# MulObjectRef, but a term's xpath sees only its own record, so the owning
-# collection cannot be joined in here.
-[[modules.terms]]
-term = "dc:publisher"
-literal = "Kupferstichkabinett, Staatliche Museen zu Berlin"
-
-[[modules.terms]]
-term = "dc:language"
-literal = "de"
 

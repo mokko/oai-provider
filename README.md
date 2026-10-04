@@ -94,7 +94,21 @@ prefix = "ria"
 namespace = "http://www.zetcom.com/ria/ws/module"
 kind = "passthrough"
 
-# module mode: one database per module; sets and DC terms belong to a module
+# a derived format carries its whole mapping: one term per element, `module`
+# naming whose records it applies to
+[[metadata.formats]]
+prefix = "oai_dc"
+namespace = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+kind = "derived"
+wrapper = "oai_dc:dc"
+namespaces = { oai_dc = "…oai_dc/", dc = "http://purl.org/dc/elements/1.1/" }
+
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:type"
+xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
+
+# module mode: one database per module; a set belongs to the module it filters
 [[modules]]
 name = "Object"
 database = "sync_Object"
@@ -105,10 +119,6 @@ identifierPrefix = "spk-berlin.de:object-"
 spec = "KK"
 label = "Kupferstichkabinett, Staatliche Museen zu Berlin"
 xpath = "moduleReference[@name='ObjOwnerRef']/moduleReferenceItem[@moduleItemId='112264']"
-
-[[modules.terms]]
-term = "dc:type"
-xpath = "//dataField[@name='ObjTechnicalTermClb']/value"
 ```
 
 The real file configures all three formats (`ria`, `oai_dc`, `lido`) and all

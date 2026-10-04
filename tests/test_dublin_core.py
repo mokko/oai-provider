@@ -41,12 +41,40 @@ def test_the_shipped_config_advertises_dublin_core(config: Config) -> None:
     assert fmt.namespace == OAI_DC_NS
 
 
-def test_every_module_maps_its_own_terms(config: Config) -> None:
+def test_every_module_has_its_own_dc_terms(config: Config) -> None:
     """The three modules are three record shapes, so none may be left without
-    terms - an empty oai_dc would be disseminated silently otherwise."""
+    terms - an empty oai_dc would be disseminated silently otherwise. The whole
+    mapping is one block under the format, each term naming its module."""
+    fmt = next(f for f in config.formats if f.prefix == "oai_dc")
+    qb = _builder(config)
     for module in config.modules:
-        assert module.terms, f"{module.name} has no dc terms"
-        assert {t.term for t in module.terms} >= {"dc:language"}
+        terms = qb.terms_for(module, fmt)
+        assert terms, f"{module.name} has no dc terms"
+        assert {t.term for t in terms} >= {"dc:language"}
+
+
+def test_a_module_scoped_term_applies_only_to_that_module(config: Config) -> None:
+    """Scoping is the whole point of keeping the mapping in one block: an Object
+    term must not leak into a Person record's metadata."""
+    fmt = next(f for f in config.formats if f.prefix == "oai_dc")
+    qb = _builder(config)
+    obj, per = config.modules[0], config.modules[1]
+    assert "dc:format" in {t.term for t in qb.terms_for(obj, fmt)}
+    assert "dc:format" not in {t.term for t in qb.terms_for(per, fmt)}
+
+
+def test_a_module_key_under_modules_terms_is_rejected(tmp_path) -> None:
+    """[[modules.terms]] is already scoped to its module, so a `module` key
+    there would silently do nothing - a mistake, not a narrowing."""
+    with pytest.raises(ConfigError, match="redundant"):
+        _derived_config(
+            tmp_path,
+            '[[metadata.formats]]\nprefix = "oai_dc"\nnamespace = "urn:x"\n'
+            'kind = "derived"\nwrapper = "oai_dc:dc"\n'
+            'namespaces = { oai_dc = "urn:oai_dc", dc = "urn:dc" }\n'
+            '[[modules]]\nname = "Object"\ndatabase = "d"\n'
+            '[[modules.terms]]\nmodule = "Object"\nterm = "dc:title"\nxpath = "a"\n',
+        )
 
 
 def test_a_term_needs_exactly_one_source() -> None:

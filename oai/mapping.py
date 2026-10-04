@@ -142,10 +142,24 @@ class QueryBuilder:
         blocks = ",\n".join(self._module_payload(m, fmt) for m in self.modules)
         return f"(\n{blocks}\n)"
 
+    def terms_for(self, module, fmt) -> tuple:
+        """The DC terms that apply to one module's records.
+
+        A module may carry its own [[modules.terms]]; otherwise it takes the
+        format's terms scoped to it (`module = "<Name>"`) or unscoped (shared by
+        every module). Resolved here so that the query only ever carries the
+        rules for the record in hand.
+        """
+        if module.terms:
+            return module.terms
+        if fmt is None or fmt.kind != "derived":
+            return ()
+        return tuple(t for t in fmt.terms if t.module in ("", module.name))
+
     def _module_payload(self, module, fmt=None) -> str:
         if fmt is not None and fmt.kind == "xslt":
             return self._xslt_payload(module, fmt)
-        terms = module.terms or (fmt.terms if fmt else ())
+        terms = self.terms_for(module, fmt)
         body = self._metadata_branch(fmt, terms, "$src", "$src")
         prefix = _xq_string(module.identifier_prefix)
         return (
@@ -268,7 +282,7 @@ class QueryBuilder:
         time rather than anything a unit test would catch.
         """
         if fmt is not None and fmt.kind == "derived":
-            inner = self._term_exprs(terms or fmt.terms, base)
+            inner = self._term_exprs(terms, base)
             # **The terms go in an enclosed expression, not bare inside the
             # element.** A direct element constructor treats everything between
             # the tags as text unless it is inside { }, so an unbraced `for $v

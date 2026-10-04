@@ -183,6 +183,11 @@ class TermRule:
     one of `xpath` / `literal` is set: an XPath relative to the record, or a
     constant written here (dc:language "de").
 
+    `module` scopes the rule to one module's records. The three modules are
+    three different record shapes, so a term rarely applies to all of them;
+    empty means "every module". It is only meaningful inside a format's own
+    terms - a [[modules.terms]] entry is scoped already.
+
     **An empty value is never emitted** - the element is left out instead. That
     is what "correct Dublin Core" means here: a term with no source is absent,
     not present and blank.
@@ -191,6 +196,7 @@ class TermRule:
     term: str
     xpath: str = ""
     literal: str = ""
+    module: str = ""
 
     def __post_init__(self) -> None:
         if not TERM_RE.fullmatch(self.term):
@@ -204,6 +210,27 @@ class TermRule:
 
 
 TERM_RE = re.compile(r"^[A-Za-z_][\w.\-]*:[A-Za-z_][\w.\-]*$")
+
+
+def _term_from(t: dict, where: str, *, allow_module: bool) -> TermRule:
+    """One TermRule from a config table.
+
+    `where` names the block for error messages. A [[modules.terms]] entry is
+    already scoped to its module, so a `module` key there is a mistake rather
+    than a further narrowing - it would silently do nothing.
+    """
+    if t.get("module") and not allow_module:
+        raise ConfigError(
+            f"{where}: a [[modules.terms]] entry is already scoped to its "
+            f"module, so `module = {t['module']!r}` is redundant - drop it, or "
+            "move the terms under the format to scope them explicitly"
+        )
+    return TermRule(
+        term=t["term"],
+        xpath=t.get("xpath", ""),
+        literal=t.get("literal", ""),
+        module=t.get("module", ""),
+    )
 
 
 @dataclass(frozen=True)
@@ -224,6 +251,8 @@ class MetadataFormat:
     # because a query's prefixes resolve against its own prolog.
     wrapper: str = ""
     namespaces: dict[str, str] = field(default_factory=dict)
+    # kind="derived": what to emit, each rule optionally scoped to one module
+    # via TermRule.module. A module's own [[modules.terms]] overrides these.
     terms: tuple[TermRule, ...] = ()
     # kind="xslt": an XSLT stylesheet that turns a record into metadata. The
     # transform runs **inside BaseX** (xslt:transform), so the payload never
@@ -426,10 +455,10 @@ class Config:
                     for s in m.get("sets", [])
                 ),
                 terms=tuple(
-                    TermRule(
-                        term=t["term"],
-                        xpath=t.get("xpath", ""),
-                        literal=t.get("literal", ""),
+                    _term_from(
+                        t,
+                        f"[[modules]] {m.get('name')!r}",
+                        allow_module=False,
                     )
                     for t in m.get("terms", [])
                 ),
@@ -484,10 +513,10 @@ class Config:
                 record=f.get("record", ""),
                 modules=tuple(f.get("modules", ())),
                 terms=tuple(
-                    TermRule(
-                        term=t["term"],
-                        xpath=t.get("xpath", ""),
-                        literal=t.get("literal", ""),
+                    _term_from(
+                        t,
+                        f"[[metadata.formats]] {f['prefix']!r}",
+                        allow_module=True,
                     )
                     for t in f.get("terms", [])
                 ),
@@ -530,24 +559,38 @@ class Config:
                 dataclasses.replace(fmt, stylesheet=str(sheet))
             )
         formats = tuple(resolved_formats)
-        # A derived format needs somewhere to get its terms. Either it carries
-        # its own (which every source then shares), or every module brings its
-        # own - and a module that has none would silently disseminate an empty
-        # oai_dc, so that is an error rather than an omission.
+        # A derived format needs terms for every module it serves. They may come
+        # from the module ([[modules.terms]]), from a term scoped to it under
+        # the format (`module = "Object"`), or from an unscoped term shared by
+        # all of them. A module left with none would disseminate an empty
+        # oai_dc silently, so that is a load error rather than an omission.
         for fmt in formats:
-            if fmt.kind != "derived" or fmt.terms:
+            if fmt.kind != "derived":
                 continue
             if not modules:
                 raise ConfigError(
-                    f"metadata format {fmt.prefix!r} is derived but has no "
-                    "[[metadata.formats.terms]]"
+                    f"metadata format {fmt.prefix!r} is derived but there are "
+                    "no [[modules]]: only module mode can produce a record"
                 )
-            missing = [m.name for m in modules if not m.terms]
+            unknown = sorted(
+                {t.module for t in fmt.terms if t.module} - module_names_all
+            )
+            if unknown:
+                raise ConfigError(
+                    f"metadata format {fmt.prefix!r} is derived but its terms "
+                    "name modules that are not in [[modules]]: "
+                    + ", ".join(unknown)
+                )
+            if any(not t.module for t in fmt.terms):
+                continue  # unscoped terms cover every module
+            scoped = {t.module for t in fmt.terms}
+            missing = [
+                m.name for m in modules if not m.terms and m.name not in scoped
+            ]
             if missing:
                 raise ConfigError(
-                    f"metadata format {fmt.prefix!r} has no terms of its own, "
-                    "so every module must define them; missing for: "
-                    + ", ".join(missing)
+                    f"metadata format {fmt.prefix!r} is derived but no terms "
+                    "are configured for module(s): " + ", ".join(missing)
                 )
         if not formats:
             raise ConfigError(
