@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 
 from .basex import BaseXClient
 from .config import Config
-from .mapping import QueryBuilder
+from .mapping import LIDO_NS, ZETCOM_NS, QueryBuilder
 
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
@@ -40,6 +40,15 @@ TOKEN_VERSION = 1
 # namespace they are in.
 ET.register_namespace("oai", OAI_NS)
 ET.register_namespace("oai_dc", OAI_DC_NS)
+
+# The payloads carry the source vocabularies - RIA for a `ria` record, LIDO for a
+# `lido` one - and ElementTree invents `ns2:` for any namespace outside its
+# well-known map. Register the prefixes the data and the config already use, so a
+# served record reads like the export it came from instead of like a parser's
+# leftovers. Registered here, beside the OAI ones, so the wire naming is decided
+# in one place.
+ET.register_namespace("z", ZETCOM_NS)
+ET.register_namespace("lido", LIDO_NS)
 
 VERBS = (
     "Identify",

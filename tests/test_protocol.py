@@ -232,6 +232,34 @@ def test_the_response_uses_the_conventional_oai_prefix() -> None:
     assert "ns0:" not in body
 
 
+def test_the_payload_keeps_its_own_prefixes() -> None:
+    """A served record should read like the export it came from.
+
+    ElementTree writes `ns2:` for the source vocabularies otherwise - RIA on a
+    `ria` record, LIDO on a `lido` one - which tells a human reading the response
+    nothing about what the namespace is.
+    """
+    import re
+
+    from xml.etree import ElementTree as ET
+
+    from oai.mapping import LIDO_NS, ZETCOM_NS
+    from oai.protocol import q, serialise
+
+    root = ET.Element(q("OAI-PMH"))
+    ria = ET.SubElement(root, f"{{{ZETCOM_NS}}}moduleItem")
+    ria.set("id", "851035")
+    ET.SubElement(ria, f"{{{ZETCOM_NS}}}dataField").set("name", "ObjObjectNumberTxt")
+    ET.SubElement(root, f"{{{LIDO_NS}}}lido")
+    body = serialise(root).decode()
+
+    assert f'xmlns:z="{ZETCOM_NS}"' in body
+    assert f'xmlns:lido="{LIDO_NS}"' in body
+    assert "<z:moduleItem" in body
+    assert "<lido:lido" in body
+    assert not re.search(r"<ns\d+:", body), body[:400]
+
+
 def test_tampered_token_is_rejected() -> None:
     token = encode_token(state(), SECRET)
     body, _, sig = token.partition(".")

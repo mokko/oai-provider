@@ -23,6 +23,10 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "xq"
 # with this namespace - the reverse of the ingest's local:strip().
 ZETCOM_NS = "http://www.zetcom.com/ria/ws/module"
 
+# LIDO's namespace, the one the served LIDO records and the related-works pass
+# speak.
+LIDO_NS = "http://www.lido-schema.org"
+
 # Re-namespace a stored record for an XSLT that expects RIA. Attribute names are
 # kept as they are: module ingest only ever dropped ELEMENT namespaces in
 # practice, and an unprefixed attribute belongs to no namespace either way.
