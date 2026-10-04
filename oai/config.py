@@ -510,16 +510,17 @@ class Config:
         module_names = [m.name for m in modules]
         if len(module_names) != len(set(module_names)):
             raise ConfigError("duplicate module name in [[modules]]")
-        # Module mode cannot report deletions: each database is dropped and
-        # rebuilt from a full dump, so nothing knows what vanished. Advertising
-        # "persistent" or "transient" while serving no tombstones is the one
-        # lie a harvester can never detect, so it is a configuration error
-        # rather than a note in the docs.
+        # Module mode cannot report deletions: ingest is additive and never
+        # deletes, and --reset rebuilds a module database from a single dump -
+        # either way nothing knows what vanished, so no tombstone can ever be
+        # served. Advertising "persistent" or "transient" while serving no
+        # tombstones is the one lie a harvester can never detect, so it is a
+        # configuration error rather than a note in the docs.
         if modules and identity.deleted_record != "no":
             raise ConfigError(
-                "module mode cannot report deletions (a module database is "
-                "dropped and rebuilt), so deletedRecord must be \"no\", not "
-                f"{identity.deleted_record!r}"
+                "module mode cannot report deletions (ingest never deletes, and "
+                "--reset rebuilds from one dump), so deletedRecord must be "
+                f"\"no\", not {identity.deleted_record!r}"
             )
 
         mapping = Mapping(

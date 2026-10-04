@@ -14,13 +14,13 @@ adminEmail = "mauricemengel@gmail.com"
 earliestDatestamp = "1970-01-01T00:00:00Z"
 granularity = "YYYY-MM-DDThh:mm:ssZ"
 # OAI's deletedRecord. The value that can be honoured is the value that is
-# true: module mode drops and rebuilds each database, so nothing records what
-# vanished from a dump, and no tombstone can be served. "no" says exactly that
-# - the source owns liveness, and a harvester must re-harvest to learn of a
-# withdrawal. Claiming "persistent" while serving no deletions is the one
-# thing a harvester can never detect. (The enveloped ingest *can* reconcile,
-# but it is not the deployment path; see README, "Serving from the module
-# databases".)
+# true: module ingest is additive and never deletes (and --reset rebuilds a
+# database from one dump), so nothing records what vanished from a dump, and no
+# tombstone can be served. "no" says exactly that - the source owns liveness,
+# and a harvester must re-harvest to learn of a withdrawal. Claiming
+# "persistent" while serving no deletions is the one thing a harvester can
+# never detect. (The enveloped ingest *can* reconcile, but it is not the
+# deployment path; see AGENTS.md, "Module mode".)
 deletedRecord = "no"
 description = "Zetcom MuseumPlus RIA XML, enveloped per moduleItem."
 

@@ -86,9 +86,10 @@ def test_a_module_without_a_database_is_rejected(tmp_path) -> None:
 
 
 def test_module_mode_refuses_a_deleted_record_policy(tmp_path) -> None:
-    """Module databases are dropped and rebuilt, so no tombstone can be served.
-    Advertising "persistent" would be the one lie a harvester cannot detect, so
-    the combination is rejected at load time rather than documented."""
+    """Module ingest never deletes (additive by default; --reset rebuilds from
+    one dump), so no tombstone can be served. Advertising "persistent" would be
+    the one lie a harvester cannot detect, so the combination is rejected at
+    load time rather than documented."""
     text = (ROOT / "oai.toml").read_text().replace(
         'deletedRecord = "no"', 'deletedRecord = "persistent"'
     )
