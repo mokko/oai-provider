@@ -57,7 +57,9 @@ Consequences worth knowing:
   `--reset` is the destructive one: it rebuilds a module database from a single
   file, so running it per chunk leaves only the last chunk's records.
 - Tombstone support is an **open question**, blocked on what the colleague's
-  setup does — see `todo/deleted-records.md`.
+  setup does — see `todo/deleted-records.md`. **`envelope.md`** at the repo root
+  describes the storage mode that *could* detect withdrawals (removed), why it
+  existed, and what is lost without it.
 
 ## Module mode — one database per module
 

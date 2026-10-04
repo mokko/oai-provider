@@ -52,3 +52,7 @@ returns that header with status deleted. `persistent` means the tombstone stays 
 Ask before building. Every option above moves `deletedRecord` off `"no"`, which module mode
 currently **rejects** at load time, so the detection mechanism and the policy have to land together
 — not as a config flag flipped on its own.
+
+**Background:** `envelope.md` at the repo root describes the storage mode that *did* detect
+withdrawals (and has since been removed): what it did, why it existed, and exactly what is lost
+without it.
