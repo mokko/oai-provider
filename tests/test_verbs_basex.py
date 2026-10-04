@@ -387,3 +387,59 @@ def test_paging_with_payloads(cfg: Config) -> None:
     root = call(small, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
     assert len(root.findall(f"{q('ListRecords')}/{q('metadata')}")) == 1
     assert len(headers(root)) == 1
+
+
+class _Counting(BaseXClient):
+    """Counts HTTP round trips, to prove a page does no redundant work.
+
+    The whole point of taking the total from the first page's own scan is that
+    a harvest no longer pays for a separate COUNT query per page.
+    """
+
+    def __init__(self, *a, **k) -> None:
+        super().__init__(*a, **k)
+        self.posts = 0
+
+    async def _post(self, query, variables):  # type: ignore[override]
+        self.posts += 1
+        return await super()._post(query, variables)
+
+
+def _call_counting(cfg: Config, *pairs: tuple[str, str]):
+    async def go():
+        async with _Counting(
+            cfg.basex.url, cfg.basex.user, cfg.basex.password, cfg.basex.timeout
+        ) as bx:  # type: ignore[assignment]
+            provider = Provider(cfg, bx)
+            bx.posts = 0
+            root = await provider.handle(list(pairs))
+            return bx.posts, root
+
+    return asyncio.run(go())
+
+
+def test_resumption_costs_one_query_per_page(cfg: Config) -> None:
+    """completeListSize comes from the first page's scan, and a resume carries
+    it in the token - so neither the first page nor a resume issues a second,
+    separate COUNT query. Two queries per page is the regression this locks
+    out."""
+    seed(cfg, SAMPLE, "dump-trips")
+    small = dataclasses.replace(
+        cfg, protocol=dataclasses.replace(cfg.protocol, page_size=2)
+    )
+
+    trips, root = _call_counting(
+        small, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria")
+    )
+    assert trips == 1, f"first page should be one query, made {trips}"
+    tok = root.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
+    assert tok is not None and tok.text, "expected a token with another page"
+    assert tok.get("completeListSize") == "3"
+
+    trips2, root2 = _call_counting(
+        small, ("verb", "ListIdentifiers"), ("resumptionToken", tok.text)
+    )
+    assert trips2 == 1, f"resume should be one query, made {trips2}"
+    # the total was carried in the token, not recomputed
+    final = root2.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
+    assert final is not None and final.get("completeListSize") == "3"

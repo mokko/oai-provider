@@ -19,7 +19,7 @@ that looked correct.
   tokens, `serialise`, and the `xslt_problem` startup probe.
 - `oai/app.py` — the Starlette app; `GET`/`POST /oai`, `GET /healthz`.
 - `xq/*.xq.tmpl` — the query templates: `ingest`, `validate`, `reconcile`,
-  `stale`, `count`, `page`, `record`, and the module-mode variants.
+  `stale`, `page`, `record`, and the module-mode variants.
 - `tools/ingest.py` — the CLI.
 
 ## Ingest
@@ -188,6 +188,11 @@ which the earlier Perl provider's in-memory chunk cache could not survive.
   returning a wrong slice. It also expires (`protocol.tokenTTL`), which is what
   replaces server-side eviction.
 - `completeListSize` is the size of the whole pinned result set, not the page.
+- **No second scan for the total.** The first page counts the pinned set from
+  the scan it already runs (its cursor is empty, so the matching set *is* the
+  result set); a resume reads the total from the token. So a page is one BaseX
+  round trip, not two. Measured and locked in by
+  `test_resumption_costs_one_query_per_page`.
 
 ## Metadata formats
 

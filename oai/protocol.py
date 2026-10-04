@@ -459,6 +459,7 @@ class Provider:
         after_id: str,
         with_payload: bool,
         fmt=None,
+        want_total: bool = False,
     ) -> Page:
         limit = self.config.protocol.page_size
         nodes = await self.client.query_nodes(
@@ -471,11 +472,17 @@ class Provider:
             afterId=after_id,
             limit=limit,
             withPayload="true" if with_payload else "false",
+            wantTotal="true" if want_total else "false",
         )
         rows: list[ET.Element] = []
+        total = 0
         if nodes:
             if nodes[0].tag == PAGE_TAG:
                 rows = list(nodes[0])
+                # present only when want_total. On the first page the cursor is
+                # empty, so this count IS the whole pinned set - which is why
+                # the caller needs no separate COUNT query.
+                total = int(nodes[0].get("total") or 0)
             else:
                 rows = nodes
         has_more = len(rows) > limit
@@ -483,24 +490,11 @@ class Provider:
         return Page(
             rows=rows,
             has_more=has_more,
-            complete_list_size=0,
+            complete_list_size=total,
             pinned_until=until,
             last_datestamp=rows[-1].get("datestamp", "") if rows else after_ds,
             last_identifier=rows[-1].get("identifier", "") if rows else after_id,
         )
-
-    async def count_matching(
-        self, *, set_spec: str, from_: str, until: str, fmt=None
-    ) -> int:
-        text = await self.client.query(
-            self.builder.count_query(fmt),
-            **self.source_vars,
-            set=set_spec,
-            **{"from": from_},
-            until=until,
-            withPayload="false",
-        )
-        return int(text.strip() or 0)
 
     # -- verbs -----------------------------------------------------------
 
@@ -576,6 +570,7 @@ class Provider:
         """Shared implementation of ListIdentifiers and ListRecords."""
         with_payload = verb == "ListRecords"
         db = self.config.basex.database
+        total = 0
 
         if request.token:
             # A resumption request carries NO metadataPrefix - the spec makes
@@ -621,10 +616,10 @@ class Provider:
             pinned = min(requested_until, now) if requested_until else now
             after_ds = after_id = ""
             delivered = 0
-            total = await self.count_matching(
-                set_spec=set_spec, from_=from_, until=pinned, fmt=fmt
-            )
+            # The total is NOT counted here: the first page is asked for it and
+            # counts it from the scan it already runs. See fetch_page.
 
+        fresh = not request.token
         page = await self.fetch_page(
             set_spec=set_spec,
             from_=from_,
@@ -633,7 +628,10 @@ class Provider:
             after_id=after_id,
             with_payload=with_payload,
             fmt=fmt,
+            want_total=fresh,
         )
+        if fresh:
+            total = page.complete_list_size
 
         if not page.rows and not request.token:
             raise ProtocolError(

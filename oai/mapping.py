@@ -460,9 +460,6 @@ class QueryBuilder:
     def page_query(self, fmt=None) -> str:
         return self.render("page.xq.tmpl", fmt=fmt)
 
-    def count_query(self, fmt=None) -> str:
-        return self.render("count.xq.tmpl", fmt=fmt)
-
     def record_query(self, fmt=None) -> str:
         return self.render("record.xq.tmpl", fmt=fmt)
 

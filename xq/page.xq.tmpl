@@ -39,6 +39,12 @@ declare variable $afterId external;
    early instead of silently comparing as text. :)
 declare variable $limit as xs:integer external;
 declare variable $withPayload external;
+(: True only on the FIRST page of a harvest. Then the total is counted from
+   this same scan (the cursor is empty, so $matching IS the pinned result
+   set), and the caller issues no separate COUNT query. A resume carries the
+   total in its token and passes false, so it pays for nothing it does not
+   use. :)
+declare variable $wantTotal external;
 
 let $rows := {{SOURCE}}
 
@@ -63,8 +69,13 @@ let $matching :=
 let $wanted := subsequence($matching, 1, $limit + 1)
 let $payloads := if ($withPayload = 'true') then {{PAYLOADS}} else ()
 
+(: count() over an already-materialised sequence adds no scan; it is the whole
+   point of asking the page for its own total. :)
+let $total_attr :=
+  if ($wantTotal = 'true') then attribute total { count($matching) } else ()
+
 return
-  <page>{
+  <page>{ $total_attr }{
     for $r in $wanted
     return
       <row datestamp="{$r/@datestamp}"
