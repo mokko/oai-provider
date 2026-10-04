@@ -325,11 +325,11 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
         ("identifier", "spk-berlin.de:EM-person-77"),
         ("metadataPrefix", "ria"),
     )
-    header = root.find(f"{q('GetRecord')}/{q('header')}")
+    header = root.find(f"{q('GetRecord')}/{q('record')}/{q('header')}")
     assert header.find(q("identifier")).text == "spk-berlin.de:EM-person-77"
     # 10:00 local at +02:00 is 08:00Z
     assert header.find(q("datestamp")).text == "2026-03-02T08:00:00Z"
-    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     item = list(md)[0]
     assert item.tag == "moduleItem"
     assert item.find("dataField[@name='PerNameTxt']/value").text == "Doe, Jane"
@@ -367,7 +367,7 @@ def test_unknown_identifier_is_id_does_not_exist(module_config: Config) -> None:
 
 def test_list_records_carries_the_module_item_as_metadata(module_config: Config) -> None:
     root = _call(module_config, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
-    mds = root.findall(f"{q('ListRecords')}/{q('metadata')}")
+    mds = root.findall(f"{q('ListRecords')}/{q('record')}/{q('metadata')}")
     assert len(mds) == 3
     assert all(list(md)[0].tag == "moduleItem" for md in mds)
 

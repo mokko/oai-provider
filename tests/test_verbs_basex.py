@@ -178,13 +178,36 @@ def test_get_record_returns_header_and_payload(cfg: Config) -> None:
     hdrs = headers(root)
     assert hdrs[0]["identifier"] == "spk-berlin.de:object-1001"
     assert hdrs[0]["sets"] == ["mimo"]
-    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert md is not None
     payload = list(md)[0]
     # module mode stores records namespace-stripped, so the verbatim payload has
     # no Zetcom namespace here (the LIDO transform re-adds it via local:zetcom)
     assert payload.tag == "moduleItem"
     assert payload.get("id") == "1001"
+
+
+def test_records_are_wrapped_as_the_schema_requires(cfg: Config) -> None:
+    """GetRecordType and ListRecordsType each require a <record> element, so a
+    bare <header>/<metadata> under the verb is schema-invalid and a conformant
+    harvester cannot parse it. ListIdentifiers is the exception - its type takes
+    headers directly - which is why the builder branches rather than duplicating."""
+    seed(cfg, SAMPLE)
+    gr = call(
+        cfg,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:object-1001"),
+        ("metadataPrefix", "ria"),
+    )
+    assert gr.find(f"{q('GetRecord')}/{q('record')}") is not None
+    assert gr.find(f"{q('GetRecord')}/{q('header')}") is None
+
+    lr = call(cfg, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
+    assert lr.findall(f"{q('ListRecords')}/{q('record')}"), "no <record> elements"
+    assert lr.find(f"{q('ListRecords')}/{q('header')}") is None
+
+    li = call(cfg, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
+    assert li.findall(f"{q('ListIdentifiers')}/{q('header')}"), "headers go bare here"
 
 
 def test_get_record_unknown_identifier(cfg: Config) -> None:
@@ -350,7 +373,7 @@ def test_paging_with_payloads(cfg: Config) -> None:
         cfg, protocol=dataclasses.replace(cfg.protocol, page_size=1)
     )
     root = call(small, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
-    assert len(root.findall(f"{q('ListRecords')}/{q('metadata')}")) == 1
+    assert len(root.findall(f"{q('ListRecords')}/{q('record')}/{q('metadata')}")) == 1
     assert len(headers(root)) == 1
 
 

@@ -578,9 +578,12 @@ class Provider:
         if not rows:
             raise ProtocolError("idDoesNotExist", f"unknown identifier: {identifier}")
         node = ET.Element(q("GetRecord"))
-        node.append(header_el(rows[0]))
+        # GetRecordType is <sequence><element name="record"/></sequence>: the
+        # header and metadata are wrapped, never bare under the verb.
+        record = _el(node, "record")
+        record.append(header_el(rows[0]))
         if rows[0].get("status") != "deleted":
-            node.append(self._metadata(rows[0], fmt))
+            record.append(self._metadata(rows[0], fmt))
         return node
 
     def _metadata(self, row: ET.Element, fmt) -> ET.Element:
@@ -662,9 +665,17 @@ class Provider:
 
         node = ET.Element(q(verb))
         for row in page.rows:
-            node.append(header_el(row))
-            if with_payload and row.get("status") != "deleted":
-                node.append(self._metadata(row, fmt))
+            # ListRecordsType is <sequence><element name="record" maxOccurs=
+            # "unbounded"/></sequence>, so a record wraps its header and
+            # metadata. ListIdentifiersType instead takes <header> directly -
+            # hence the branch, not two code paths.
+            if with_payload:
+                record = _el(node, "record")
+                record.append(header_el(row))
+                if row.get("status") != "deleted":
+                    record.append(self._metadata(row, fmt))
+            else:
+                node.append(header_el(row))
 
         at_end = not page.has_more
         if page.rows:

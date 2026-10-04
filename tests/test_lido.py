@@ -218,7 +218,7 @@ def test_get_record_as_lido(live: Config) -> None:
         ("metadataPrefix", "lido"),
     )
     assert root.find(q("error")) is None
-    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert md is not None and len(md), "no metadata served"
     rec = list(md)[0]
     assert rec.tag == f"{LIDO}lido"
@@ -248,5 +248,5 @@ def test_the_raw_payload_is_untouched_by_having_asked_for_lido(live: Config) -> 
         ("identifier", "spk-berlin.de:object-935894"),
         ("metadataPrefix", "ria"),
     )
-    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert list(md)[0].tag == "moduleItem"

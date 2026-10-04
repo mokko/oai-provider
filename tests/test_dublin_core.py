@@ -292,7 +292,7 @@ def _call(config: Config, *pairs: tuple[str, str]):
 
 
 def _dc_of(root) -> list[tuple[str, str]]:
-    md = root.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert md is not None and len(md), "no metadata element"
     dc = list(md)[0]
     return [
@@ -336,5 +336,42 @@ def test_the_shipped_mapping_serves_dublin_core_from_the_real_modules(
         ("identifier", "x:obj-1001"),
         ("metadataPrefix", "ria"),
     )
-    md = ria.find(f"{q('GetRecord')}/{q('metadata')}")
+    md = ria.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert list(md)[0].tag == "moduleItem"
+
+
+def test_the_object_title_is_the_virtual_field(config: Config) -> None:
+    """`ObjObjectTitleVrt` is the museum's own display title: non-empty on
+    1000/1000 objects, and equal to the ObjObjectTitleGrp item with SortLnu = 1
+    in all of them (measured over the real export, not the fixture - the fixture
+    carries no title field at all, which is why dc:title was missing)."""
+    fmt = next(f for f in config.formats if f.prefix == "oai_dc")
+    titles = [
+        t for t in fmt.terms if t.term == "dc:title" and t.module == "Object"
+    ]
+    assert titles, "the Object module maps no dc:title"
+    assert titles[0].xpath == "//virtualField[@name='ObjObjectTitleVrt']/value"
+
+
+def test_every_record_on_a_real_page_serves_a_title(live: Config) -> None:
+    """End to end against the module databases: the export titles every object,
+    so no record on a page may come back without a dc:title. The fixture cannot
+    prove this - it has no title field."""
+    root = _call(
+        live,
+        ("verb", "ListRecords"),
+        ("metadataPrefix", "oai_dc"),
+        ("set", "KK"),
+    )
+    records = root.findall(f"{q('ListRecords')}/{q('record')}")
+    assert records, "no records served"
+    for rec in records:
+        md = rec.find(f"{q('metadata')}")
+        assert md is not None, "record served without metadata"
+        dc = list(md)[0]
+        titles = [
+            (c.text or "").strip()
+            for c in dc
+            if c.tag.split("}")[-1] == "title"
+        ]
+        assert titles and all(titles), "a record was served without a dc:title"

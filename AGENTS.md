@@ -165,6 +165,19 @@ GetRecord, ListIdentifiers, ListRecords) with the error codes customarily
 expected: badArgument, badVerb, cannotDisseminateFormat, idDoesNotExist,
 noRecordsMatch, badResumptionToken, noSetHierarchy.
 
+## Response shape (schema, not style)
+
+- **The verb element wraps its records — except `ListIdentifiers`.** Per
+  `OAI-PMH.xsd`: `GetRecordType` is a sequence of exactly one `record`,
+  `ListRecordsType` a sequence of `record` elements followed by an optional
+  `resumptionToken`, and `ListIdentifiersType` takes `header` elements directly.
+  So `GetRecord` and `ListRecords` emit `<record><header/>[<metadata/>]</record>`
+  while `ListIdentifiers` emits bare `<header/>`. A bare `header`/`metadata`
+  under `GetRecord` or `ListRecords` is **schema-invalid** — a conformant
+  harvester cannot parse it — which is what this served until the schema was
+  checked by hand and `test_records_are_wrapped_as_the_schema_requires` landed.
+  The builder branches once on `with_payload` rather than duplicating the loop.
+
 ## Resumption tokens
 
 Stateless and signed, so a restart cannot invalidate a harvest in progress —
@@ -241,8 +254,12 @@ silently do nothing.
   load error.
 - **The mapping is authored, not inferred.** Each term is a field the record
   really has, or a literal declared as one (`dc:language = "de"`). Nothing is
-  invented: the Object module has no title field in the real export, so there
-  is deliberately no `dc:title` for objects.
+  invented — but the corollary bit us once: `dc:title` was left out for objects
+  because the *sample fixture* has no title, while the real export titles every
+  object (`ObjObjectTitleVrt`, 1000/1000, equal to the `ObjObjectTitleGrp` item
+  with `SortLnu = 1` in all 1000). **Fixture and real data disagree in both
+  directions** — the fixture carries `ObjObjectTitleClb`, which the export never
+  has. Count coverage against the module databases, never against the fixture.
 - Fields were chosen by **coverage counted over the real data**, not by name —
   the notes in `oai.toml` carry the counts beside each choice.
 

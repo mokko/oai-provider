@@ -91,12 +91,26 @@ namespaces = { oai_dc = "http://www.openarchives.org/OAI/2.0/oai_dc/", dc = "htt
 
 # ---- Object ---------------------------------------------------------------
 # Grounded in what the 1000 real objects actually carry (coverage counted, not
-# assumed): object number 1000/1000, main participant 1000/1000, technical term
-# 999/1000, material/technique 998/1000, date virtual field 863/1000.
+# assumed): title 1000/1000, object number 1000/1000, main participant
+# 1000/1000, technical term 999/1000, material/technique 998/1000, date virtual
+# field 863/1000.
 #
-# **There is no title field.** The sample fixture's ObjObjectTitleClb occurs
-# zero times in the real export, so dc:title is deliberately absent rather
-# than filled with something that is not a title.
+# The title is the museum's own display title, `ObjObjectTitleVrt`: present and
+# non-empty on all 1000 objects, and equal to the `ObjObjectTitleGrp` item whose
+# SortLnu is 1 in all 1000. The group's remaining items are variants
+# ("Sammlungstitel", "Weiterer Titel", "Abweichender Titel", "Originaltitel"…)
+# on 87 records; they are deliberately *not* mapped, because a harvester asking
+# for dc:title wants the title, not the title history.
+#
+# **The test fixture has none of these fields** (it carries ObjObjectTitleClb,
+# which the real export never has, and no ObjObjectTitleVrt at all), so a
+# fixture-based test cannot see a title. That is why dc:title was missing here
+# for so long - count coverage against the module databases, not the fixture.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:title"
+xpath = "//virtualField[@name='ObjObjectTitleVrt']/value"
+
 [[metadata.formats.terms]]
 module = "Object"
 term = "dc:identifier"
