@@ -450,6 +450,10 @@ class Provider:
         self.source_vars = {
             "db": "",
             "tzOffset": config.timezone_offset,
+            # the deployment's vocmap, for the formats that resolve related-work
+            # ISILs locally (see todo/related-works-online.md); "" when no format
+            # asks for it
+            "vocmap": next((f.vocmap for f in config.formats if f.vocmap), ""),
         }
 
     # -- helpers ---------------------------------------------------------

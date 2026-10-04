@@ -277,6 +277,13 @@ class MetadataFormat:
     stylesheet: str = ""
     record: str = ""
     modules: tuple[str, ...] = ()
+    # kind="xslt" only: some stylesheets emit `relatedWork`s whose target has to
+    # be resolved against *this* store rather than a second remote query.
+    # `vocmap` is the vocabulary mapping that turns a holding institution into an
+    # ISIL; `related_works_online_only` switches the resolution on. See
+    # todo/related-works-online.md.
+    vocmap: str = ""
+    related_works_online_only: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in {"passthrough", "derived", "xslt"}:
@@ -297,6 +304,19 @@ class MetadataFormat:
                         f"metadata format {self.prefix!r}: record {self.record!r} "
                         f"uses undeclared prefix {prefix!r}"
                     )
+                if self.related_works_online_only:
+                    if not self.vocmap:
+                        raise ConfigError(
+                            f"metadata format {self.prefix!r}: relatedWorksOnlineOnly "
+                            "needs a vocmap path - it is what turns an institution "
+                            "into an ISIL"
+                        )
+                    if self.namespaces.get("lido") != "http://www.lido-schema.org":
+                        raise ConfigError(
+                            f"metadata format {self.prefix!r}: relatedWorksOnlineOnly "
+                            "expects the LIDO namespace bound to the prefix 'lido' "
+                            "in its namespaces table; the generated query uses it"
+                        )
         if self.kind == "derived":
             if not self.wrapper:
                 raise ConfigError(
@@ -521,6 +541,10 @@ class Config:
                 stylesheet=f.get("stylesheet", ""),
                 record=f.get("record", ""),
                 modules=tuple(f.get("modules", ())),
+                vocmap=f.get("vocmap", ""),
+                related_works_online_only=bool(
+                    f.get("relatedWorksOnlineOnly", False)
+                ),
                 terms=tuple(
                     _term_from(
                         t,
@@ -564,9 +588,20 @@ class Config:
                     f"metadata format {fmt.prefix!r}: modules "
                     f"{', '.join(unknown)} are not in [[modules]]"
                 )
-            resolved_formats.append(
-                dataclasses.replace(fmt, stylesheet=str(sheet))
-            )
+            # `vocmap` is resolved against the config file too - and must exist,
+            # because a format that promises to resolve ISILs without one would
+            # fail once a harvester asked for it.
+            changes = {"stylesheet": str(sheet)}
+            if fmt.vocmap:
+                vmap = Path(fmt.vocmap)
+                if not vmap.is_absolute():
+                    vmap = (path.parent / vmap).resolve()
+                if not vmap.is_file():
+                    raise ConfigError(
+                        f"metadata format {fmt.prefix!r}: vocmap not found: {vmap}"
+                    )
+                changes["vocmap"] = str(vmap)
+            resolved_formats.append(dataclasses.replace(fmt, **changes))
         formats = tuple(resolved_formats)
         # A derived format needs terms for every module it serves. They may come
         # from the module ([[modules.terms]]), from a term scoped to it under

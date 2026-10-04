@@ -16,6 +16,9 @@
 {{ZETCOM_FUNCTION}}
 
 declare variable $db external;
+(: absolute path to vocmap.xml, for the related-works ISIL lookup. An unbound
+   external variable is an error, so it is always bound even when unused. :)
+declare variable $vocmap external;
 declare variable $tzOffset external;
 declare variable $identifier external;
 declare variable $withPayload external;

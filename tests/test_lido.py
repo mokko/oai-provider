@@ -35,12 +35,17 @@ def _with_format(tmp_path: Path, extra: str) -> Config:
 
     The real config's stylesheet path is relative to the repo, so it is made
     absolute here too - otherwise writing the config into tmp_path would break
-    the *existing* lido format before the new one is even looked at.
+    the *existing* lido format before the new one is even looked at. The same
+    goes for its vocmap.
     """
     text = (ROOT / "oai.toml").read_text()
     text = text.replace(
         'stylesheet = "data/lido/zml2lido.xsl"',
         'stylesheet = "' + str(ROOT / "data/lido/zml2lido.xsl") + '"',
+    )
+    text = text.replace(
+        'vocmap = "data/lido/vocmap.xml"',
+        'vocmap = "' + str(ROOT / "data/lido/vocmap.xml") + '"',
     )
     # insert before the [[modules]] table, so the file stays valid TOML
     at = text.index("\n[[modules]]\n")
@@ -127,17 +132,24 @@ def test_the_transform_runs_inside_basex(config: Config) -> None:
     assert fmt.stylesheet in expr
     # the reassembled input is re-namespaced for a stylesheet written for RIA
     assert "local:zetcom(" in expr
-    assert 'xmlns="http://www.zetcom.com/ria/ws/module"' in expr
-    # and the record is lifted from the transform's result
-    assert "$out//lido:lido" in expr
+    # the wrapper is namespaced with a prefix, not a default namespace; see the
+    # rebuild test
+    assert 'xmlns:z="http://www.zetcom.com/ria/ws/module"' in expr
+    # and the record is lifted from the transform's result - through the
+    # related-works pass, which the shipped config switches on
+    assert "local:fixRelatedWorks(" in expr
+    assert "$fixed//lido:lido" in expr
 
 
 def test_the_world_is_rebuilt_from_all_the_databases(config: Config) -> None:
     fmt = next(f for f in config.formats if f.prefix == "lido")
     qb = QueryBuilder(config.modules, config.timezone_offset)
     expr = qb.payload_expr(fmt)
-    # itself
-    assert "<module name=\"Object\">{ local:zetcom($src) }</module>" in expr
+    # itself - wrapped with a PREFIX, never a default namespace: an xmlns="…"
+    # on the input constructor would apply to the enclosed expressions and
+    # every unprefixed name test in them would match nothing
+    assert "<z:module name=\"Object\">{ local:zetcom($src) }</z:module>" in expr
+    assert 'xmlns:z="http://www.zetcom.com/ria/ws/module"' in expr
     # people it names, forward from ObjPerAssociationRef
     assert "sync_Person" in expr and "ObjPerAssociationRef" in expr
     # assets that name IT - a reverse lookup, which is why this cannot be read

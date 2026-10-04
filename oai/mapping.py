@@ -63,6 +63,82 @@ declare function local:oaiDate($raw as xs:string?, $offset as xs:string)
 '''.strip()
 
 
+RELATED_WORKS_NAMESPACES = 'declare namespace z = "http://www.zetcom.com/ria/ws/module";'
+
+# The *functions* may sit with the other function declarations; the prefix
+# above may not - XQuery's prolog requires namespace declarations before any
+# function declaration, so it goes in the template's NAMESPACES slot, which
+# leads the prolog. The LIDO prefix is not declared here: the format declares it
+# already (validation insists it is bound to `lido`), and declaring it twice is
+# an error (XQST0033).
+RELATED_WORKS_FUNCTION = '''
+(: Where the object is held, as the institution's own display string. It is the
+   key into vocmap's `verwaltendeInstitution` concept. :)
+declare function local:verwaltendeInstitution($item as node()?) as xs:string {
+  normalize-space(string($item//z:moduleReference[@name='ObjOwnerRef']//z:formattedValue))
+};
+
+(: The same publication predicate zml2lido's relWorksCache used, read off the
+   target record instead of asking RIA: ObjPublicationGrp with PublicationVoc
+   "Ja" *and* the TypeVoc item for SMB-digital. :)
+declare function local:isOnline($item as node()?) as xs:boolean {
+  exists($item//z:repeatableGroup[@name='ObjPublicationGrp']/z:repeatableGroupItem[
+    z:vocabularyReference[@name='PublicationVoc']/z:vocabularyReferenceItem/@name = 'Ja'
+    and z:vocabularyReference[@name='TypeVoc']/z:vocabularyReferenceItem/@name =
+        'Daten freigegeben für SMB-digital'])
+};
+
+(: The ISIL for a holding institution, out of vocmap.xml. `$vocmapPath` is an
+   absolute path bound in from config: a relative doc() would resolve against the
+   query's static base URI, which for a query sent over REST is not the JVM
+   working directory. :)
+declare function local:isil($vocmapPath as xs:string?, $verw as xs:string?) as xs:string? {
+  if (empty($vocmapPath) or empty($verw)) then () else
+  doc($vocmapPath)/vocmap/voc[@name='verwaltendeInstitution']
+    /concept[source = $verw]/target[@name='ISIL']/string()
+};
+
+(: Keep only related works that are present in this store, and give the ones we
+   can an ISIL source. Objects only: LIT.ID is left alone (there is no
+   Literature module here) and KUE.ID/MM.ID likewise - see
+   todo/related-works-online.md for why those are an open question rather than
+   an oversight. An object can be online yet have no ISIL: such a set is kept,
+   and left with @source=OBJ.ID rather than half-rewritten. :)
+declare function local:fixRelatedWorks($out as node()?, $online as map(*), $isil as map(*))
+    as node()? {
+  (: the objectID is element TEXT, so it carries the serialiser's whitespace -
+     normalise before comparing it with the attribute-valued map keys, or every
+     target reads as offline. :)
+  let $dropped := copy $o := $out
+    modify (for $s in $o//lido:relatedWorkSet[
+              string(lido:relatedWork/lido:object/lido:objectID/@lido:source) = 'OBJ.ID']
+              [not(map:contains($online,
+                   normalize-space(string(lido:relatedWork/lido:object/lido:objectID))))]
+            return delete node $s)
+    return $o
+  let $rewritten := copy $o := $dropped
+    modify (
+      for $oid in $o//lido:relatedWorkSet[
+            string(lido:relatedWork/lido:object/lido:objectID/@lido:source) = 'OBJ.ID']
+            [map:contains($isil,
+             normalize-space(string(lido:relatedWork/lido:object/lido:objectID)))]
+            /lido:relatedWork/lido:object/lido:objectID
+      let $id := normalize-space(string($oid))
+      return replace node $oid with
+        element { node-name($oid) } {
+          $oid/@* except $oid/@lido:source,
+          attribute { QName('http://www.lido-schema.org', 'source') } { 'ISIL/ID' },
+          text { $isil($id) || '/' || $id }
+        }
+    )
+    return $o
+  return copy $o := $rewritten
+    modify (for $w in $o//lido:relatedWorksWrap[not(lido:relatedWorkSet)] return delete node $w)
+    return $o
+};
+'''.strip()
+
+
 def _xq_string(value: str) -> str:
     """A single-quoted XQuery string literal.
 
@@ -179,6 +255,18 @@ class QueryBuilder:
 
     # -- kind="xslt": rebuild the record's world, then transform ----------
 
+    def _zetcom_prefix(self, fmt) -> str:
+        """A prefix bound to the RIA namespace inside the generated query.
+
+        The transform input needs one: with a *default* namespace on the input
+        constructor, every unprefixed name test in its enclosed expressions would
+        resolve against RIA and match nothing.
+        """
+        for p, uri in (fmt.namespaces if fmt is not None else {}).items():
+            if uri == ZETCOM_NS:
+                return p
+        return "z"
+
     def _module_by_name(self, name: str):
         for module in self.modules:
             if module.name == name:
@@ -228,25 +316,33 @@ class QueryBuilder:
         inside BaseX, so none of this leaves the store.
         """
         prefix = _xq_string(module.identifier_prefix)
+        # The wrapper carries the RIA namespace as a **prefix**, never as a
+        # default namespace: an `xmlns="…"` on the constructor would apply to the
+        # enclosed expressions inside it, so every unprefixed name test in them
+        # (`$src//composite[@name='ObjObjectCre']`, and the `records_xpath()` of
+        # each related lookup) would resolve against the RIA namespace and match
+        # nothing - the stored records are namespace-stripped, so the whole
+        # related-world assembly silently came out empty.
+        p = self._zetcom_prefix(fmt)
         related: list[str] = []
         people = self._module_by_name("Person")
         if people is not None:
             related.append(
-                '<module name="Person">{ '
+                f'<{p}:module name="Person">{{ '
                 + self._related_forward(people, "ObjPerAssociationRef")
-                + " }</module>"
+                + " }</" + p + ":module>"
             )
         media = self._module_by_name("Multimedia")
         if media is not None:
             related.append(
-                '<module name="Multimedia">{ '
+                f'<{p}:module name="Multimedia">{{ '
                 + self._related_reverse(media, "MulObjectRef")
-                + " }</module>"
+                + " }</" + p + ":module>"
             )
         # related works point at other objects of the SAME module
         same = module.identifier
         related.append(
-            f'<module name="{module.name}">{{\n'
+            f'<{p}:module name="{module.name}">{{\n'
             f"    for $oth in collection({_xq_string(module.database)})"
             f"{module.records_xpath()}\n"
             f"      where string($oth/{same}) = $src//composite[@name='ObjObjectCre']"
@@ -254,13 +350,52 @@ class QueryBuilder:
             f"         or string($oth/{same}) = $src//moduleReference"
             "[@name='ObjLiteratureRef']//moduleReferenceItem/@moduleItemId\n"
             "      return local:zetcom($oth)\n"
-            "  }</module>"
+            "  }</" + p + ":module>"
         )
         # **`xslt:transform` returns a DOCUMENT node**, not the root element, so
         # the record sits below it ($out/lidoWrap/lido). Descending from the
         # result is what makes this independent of whether a given BaseX/Saxon
         # pair hands back a document or an element.
-        record_select = f"$out//{fmt.record}" if fmt.record else "$out"
+        # The input holds the record's *world*, not just the record, so the
+        # stylesheet emits a lido per object and the record's own must be picked
+        # out. Its lidoRecID ends in "/<id>" (the stylesheet writes ISIL/ID);
+        # the bare-id case is allowed too, so a record without an ISIL still
+        # serves rather than silently disappearing.
+        if fmt.record:
+            rec_prefix = fmt.record.split(":", 1)[0]
+            record_select = (
+                f"$out//{fmt.record}["
+                f"ends-with(normalize-space({rec_prefix}:lidoRecID), "
+                f"concat('/', $objId))"
+                f" or normalize-space({rec_prefix}:lidoRecID) = $objId]"
+            )
+        else:
+            record_select = "$out"
+        prune = ""
+        if fmt.related_works_online_only:
+            # Related works: keep only the targets held in this store, and give
+            # the ones with an ISIL an ISIL-based source. `$out` cannot be
+            # rebound inside the same FLWOR, so the fixed tree is `$fixed` and
+            # the record is taken from that. Rule and rationale:
+            # todo/related-works-online.md.
+            record_select = record_select.replace("$out", "$fixed")
+            prune = (
+                # $input IS the <application> element (a constructor, not a
+                # document), so the module list hangs directly off it - one
+                # level shallower than in the recipe, whose $input was a
+                # document node.
+                "let $targets := $input/z:modules"
+                "/z:module[@name='Object']/z:moduleItem\n"
+                "let $online := map:merge(\n"
+                "  for $m in $targets where local:isOnline($m)\n"
+                "  return map:entry(string($m/@id), true()))\n"
+                "let $isil := map:merge(\n"
+                "  for $m in $targets\n"
+                "  let $i := local:isil($vocmap, local:verwaltendeInstitution($m))\n"
+                "  where local:isOnline($m) and exists($i)\n"
+                "  return map:entry(string($m/@id), $i))\n"
+                "let $fixed := local:fixRelatedWorks($out, $online, $isil)\n"
+            )
         return (
             f"for $src in collection({_xq_string(module.database)})"
             f"{module.records_xpath()}\n"
@@ -268,14 +403,15 @@ class QueryBuilder:
             "where $id = $wanted/@identifier\n"
             f"let $objId := string($src/{module.identifier})\n"
             "let $input :=\n"
-            '  <application xmlns="' + ZETCOM_NS + '">\n'
-            "    <modules>{\n"
-            f'      <module name="{module.name}">{{ local:zetcom($src) }}</module>,\n'
+            f'  <{p}:application xmlns:{p}="{ZETCOM_NS}">\n'
+            f"    <{p}:modules>{{\n"
+            f'      <{p}:module name="{module.name}">{{ local:zetcom($src) }}</{p}:module>,\n'
             + ",\n".join("      " + r for r in related)
-            + "\n    }</modules>\n"
-            "  </application>\n"
+            + f"\n    }}</{p}:modules>\n"
+            f"  </{p}:application>\n"
             f"let $out := xslt:transform($input, {_xq_string(fmt.stylesheet)})\n"
-            f'return <p id="{{$id}}">{{ {record_select} }}</p>'
+            + prune
+            + f'return <p id="{{$id}}">{{ {record_select} }}</p>'
         )
 
     # -- what goes inside <metadata> -------------------------------------
@@ -395,12 +531,24 @@ class QueryBuilder:
         subs = {
             # Module mode stores namespace-stripped records, so a generated
             # query declares no prefixes of its own - the placeholder is empty.
-            "NAMESPACES": "",
+            # The one exception is a format that resolves related works, whose
+            # functions need the RIA and LIDO prefixes; those declarations must
+            # lead the prolog, before any function declaration.
+            "NAMESPACES": (
+                RELATED_WORKS_NAMESPACES
+                if fmt is not None and fmt.related_works_online_only
+                else ""
+            ),
             "FORMAT_NAMESPACES": self.format_namespace_declarations(fmt),
             "OAI_DATE_FUNCTION": OAI_DATE_FUNCTION,
             "SOURCE": self.source_expr(fmt),
             "PAYLOADS": self.payload_expr(fmt),
-            "ZETCOM_FUNCTION": ZETCOM_FUNCTION,
+            "ZETCOM_FUNCTION": ZETCOM_FUNCTION
+            + (
+                "\n" + RELATED_WORKS_FUNCTION
+                if fmt is not None and fmt.related_works_online_only
+                else ""
+            ),
             "TZOFFSET": self.timezone_offset,
             **extra,
         }

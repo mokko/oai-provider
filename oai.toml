@@ -425,6 +425,21 @@ record = "lido:lido"
 modules = ["Object"]
 namespaces = { lido = "http://www.lido-schema.org" }
 
+# Related works: serve only the ones that are actually held in this store, and
+# give the ones we can an ISIL-based source. This reproduces zml2lido's lvl2 step
+# (`LinkChecker.fixRelatedWorks`), which asked RIA through mpapi for each
+# target's publication status - needless here, because the target record is
+# already inside the transform input, so the check is a local XQuery and works on
+# a box with no RIA access. The rule, and the two zml2lido bugs this deliberately
+# does not reproduce (a half-rewritten @source, and a crash on an absent target),
+# are in todo/related-works-online.md.
+#
+# Set to false to serve the stylesheet's output untouched.
+relatedWorksOnlineOnly = true
+# The institution -> ISIL mapping. Resolved against this file, like the
+# stylesheet, and required to exist when the flag above is on.
+vocmap = "data/lido/vocmap.xml"
+
 # ---------------------------------------------------------------------------
 # One MuseumPlus module, one database - the colleague's `sync_<Type>` layout.
 #
