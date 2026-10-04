@@ -24,6 +24,24 @@ in progress. Nothing particularly well tested at this time.
 - **Async Python** (Starlette + httpx). The query work happens in Java, off
   the event loop.
 
+## Requirements
+
+- **Python ≥ 3.11** (see `pyproject.toml`). Hard dependency: `httpx`. To serve:
+  `starlette`, `uvicorn`, `python-multipart` (POST form parsing). Dev: `pytest`.
+  These are the `web` and `dev` extras.
+- **BaseX 12.4**, installed rootless, with a JRE 21+. REST on port **8080**.
+- **For the XSLT format (`lido`) only:**
+  - **Saxon-HE 12.5** and **xmlresolver 5.2.2** on BaseX's classpath (`lib/`).
+    BaseX's built-in `xslt:transform` is XSLT 1.0 and refuses the `zml2lido`
+    stylesheet; Saxon runs it as 3.0. The app **probes for this at startup** and
+    refuses to start without it, rather than advertise a format it cannot
+    produce.
+  - `vocmap.xml` and `europeanaFashion17.rdf` in **BaseX's working directory** —
+    the stylesheet calls `document('file:vocmap.xml')`, and a relative `file:`
+    URI resolves against the process cwd, not the stylesheet's.
+  - A LIDO transform costs roughly 0.5 s per record, so a page of 100 is
+    noticeably slower. `ria` and `oai_dc` are unaffected.
+
 ## Quick start
 
 ```bash
