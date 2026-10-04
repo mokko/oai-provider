@@ -24,6 +24,18 @@
   PlaceVoc/GeopolVoc references). That is published metadata - it is what
   dc:coverage serves - and says nothing about where the object is stored.
 
+  **Invented names.** The four people in curatorial and registrar roles -
+  across AddressRef, ExhibitionRef and ObjRegistrarRef - have been replaced
+  with imaginary ones. The artists are NOT replaced (they are what
+  dc:creator serves) and neither are the 17th-19th century owners, which are
+  the object's provenance and part of the record.
+
+  **Invented names.** Every named person is imaginary - creators, owners in
+  the provenance chain and staff in curatorial roles alike - replaced
+  consistently by surname, so one person reads the same in a creator field,
+  an ownership entry and a citation. Catalogue references ("Bartsch 39") and
+  institutional names are untouched: a citation is not a person.
+
   Replacing it again: iterparse over sdata/, clear only the moduleItem
   (never its children), re-embed under application/modules/module, then drop
   the location elements as above.
@@ -110,19 +122,19 @@
           <value>um 1532 - 1536</value>
         </virtualField>
         <virtualField name="ObjPerAssociationSmallestVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjDashboardPublicationStatusVrt">
           <value>Freigegeben</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantNameVrt">
-          <value>Heemskerck, Maarten van</value>
+          <value>Havelaar, Maarten van</value>
         </virtualField>
         <virtualField name="ObjObjectNumberSortedVrt">
           <value>79 D 2, fol. 023 recto</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjMaterialTechniqueVrt">
           <value>Feder in Braun (vitriolfreie Eisengallustinte) über Vorzeichnung mit Bleigriffel, zwei Tinten (gelb und oliv? andere Verdünnung?), Farbschnitt blau o., u., r. nur Reste, Falz = links, Recto im kleinen Zeichnungsbuch, Kettnähte horizontal, 4, 3,4 - 3,3 - 3,4 cm Abstand, Filzseite, punktueller Rötelabklatsch u. ö., alte Montierungsreste am Falz (gräulich), Klebstoffreste am Rand o. l. der M., abgegriffene Ecke r., horizontal Falten im oberen Blattviertel</value>
@@ -179,10 +191,10 @@
           <value>Päpstlicher Statuenhof und Brunnenmonument</value>
         </virtualField>
         <virtualField name="ObjObjectVrt">
-          <value>79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</value>
+          <value>79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjPerAssociationVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjObjectNumberVrt">
           <value>79 D 2, fol. 23 recto</value>
@@ -275,14 +287,14 @@
               <formattedValue language="de">04.04.2024</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>Päpstlicher Statuenhof und Brunnenmonument &lt;br&gt;&lt;div&gt;Papal Statue Court and Fountain &lt;/div&gt;&lt;div&gt;Vorzeichnung in Bleigriffel, Feder in Eisengallustinte &lt;br&gt;&lt;/div&gt;Preliminary drawing in lead stylus, pen and iron gall ink &lt;br&gt;&lt;div&gt;Kat. / cat. 26.124 (fol. 23r) &lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem &lt;i&gt;Antikencapriccio&lt;/i&gt; wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Heemskercks Skizze ist kein weiteres  Bildzeugnis dieser Anlage bekannt.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;Matthias Withoos must have seen this drawing, since he integrated the fountain into his &lt;i&gt;Antique Capriccio &lt;/i&gt;and copied it accurately even down to such imperfections as the  broken-off legs of the sphinx. Van Heemskerck’s sketch is the only known pictorial  documentation of the fountain.</value>
+              <value>Päpstlicher Statuenhof und Brunnenmonument &lt;br&gt;&lt;div&gt;Papal Statue Court and Fountain &lt;/div&gt;&lt;div&gt;Vorzeichnung in Bleigriffel, Feder in Eisengallustinte &lt;br&gt;&lt;/div&gt;Preliminary drawing in lead stylus, pen and iron gall ink &lt;br&gt;&lt;div&gt;Kat. / cat. 26.124 (fol. 23r) &lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem &lt;i&gt;Antikencapriccio&lt;/i&gt; wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Havelaars Skizze ist kein weiteres  Bildzeugnis dieser Anlage bekannt.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;Matthias Withoos must have seen this drawing, since he integrated the fountain into his &lt;i&gt;Antique Capriccio &lt;/i&gt;and copied it accurately even down to such imperfections as the  broken-off legs of the sphinx. Van Havelaar’s sketch is the only known pictorial  documentation of the fountain.</value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
               <formattedValue language="de">1</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Päpstlicher Statuenhof und Brunnenmonument Papal Statue Court and Fountain&amp;nbsp;Vorzeichnung in Bleigriffel, Feder in Eisengallustinte Preliminary drawing in lead stylus, pen and iron gall ink Kat. / cat. 26.124 (fol. 23r) Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem Antikencapriccio wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Heemskercks Skizze ist kein weiteres&amp;nbsp; Bildzeugnis dieser Anlage bekannt.Matthias Withoos must have seen this drawing, since he integrated the fountain into his Antique Capriccio and copied it accurately even down to such imperfections as the&amp;nbsp; broken-off legs of the sphinx. Van Heemskerck’s sketch is the only known pictorial&amp;nbsp; documentation of the fountain.</value>
+              <value>Päpstlicher Statuenhof und Brunnenmonument Papal Statue Court and Fountain&amp;nbsp;Vorzeichnung in Bleigriffel, Feder in Eisengallustinte Preliminary drawing in lead stylus, pen and iron gall ink Kat. / cat. 26.124 (fol. 23r) Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem Antikencapriccio wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Havelaars Skizze ist kein weiteres&amp;nbsp; Bildzeugnis dieser Anlage bekannt.Matthias Withoos must have seen this drawing, since he integrated the fountain into his Antique Capriccio and copied it accurately even down to such imperfections as the&amp;nbsp; broken-off legs of the sphinx. Van Havelaar’s sketch is the only known pictorial&amp;nbsp; documentation of the fountain.</value>
             </dataField>
             <vocabularyReference name="LanguageVoc" id="30281" instanceName="GenLanguageVgr">
               <vocabularyReferenceItem id="30727" name="de">
@@ -306,12 +318,12 @@
             </vocabularyReference>
             <moduleReference name="AddressRef" targetModule="Address" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="757082">
-                <formattedValue language="de">Tatjana Bartsch, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
+                <formattedValue language="de">Tabea Brandt, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
             <moduleReference name="ExhibitionRef" targetModule="Exhibition" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="297803">
-                <formattedValue language="de">Heemskerck, Kupferstichkabinett, Staatliche Museen zu Berlin, Dagmar Korbacher, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
+                <formattedValue language="de">Havelaar, Kupferstichkabinett, Staatliche Museen zu Berlin, Dorothea Kober, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
           </repeatableGroupItem>
@@ -401,10 +413,10 @@
               <formattedValue language="de">1</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem &lt;i&gt;Antikencapriccio&lt;/i&gt; wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Heemskercks Skizze ist kein weiteres  Bildzeugnis dieser Anlage bekannt.</value>
+              <value>Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem &lt;i&gt;Antikencapriccio&lt;/i&gt; wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Havelaars Skizze ist kein weiteres  Bildzeugnis dieser Anlage bekannt.</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem Antikencapriccio wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Heemskercks Skizze ist kein weiteres&amp;nbsp; Bildzeugnis dieser Anlage bekannt.</value>
+              <value>Diese Zeichnung muss Matthias Withoos gesehen haben, da er den Brunnen in seinem Antikencapriccio wiederverwendete und sogar Fehlstellen wie die abgebrochenen Beine der Sphinx detailgetreu kopierte. Neben Van Havelaars Skizze ist kein weiteres&amp;nbsp; Bildzeugnis dieser Anlage bekannt.</value>
             </dataField>
             <dataField dataType="Date" name="DateDat">
               <value>2024-04-04</value>
@@ -427,12 +439,12 @@
             </vocabularyReference>
             <moduleReference name="AddressRef" targetModule="Address" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="757082">
-                <formattedValue language="de">Tatjana Bartsch, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
+                <formattedValue language="de">Tabea Brandt, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
             <moduleReference name="ExhibitionRef" targetModule="Exhibition" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="297803">
-                <formattedValue language="de">Heemskerck, Kupferstichkabinett, Staatliche Museen zu Berlin, Dagmar Korbacher, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
+                <formattedValue language="de">Havelaar, Kupferstichkabinett, Staatliche Museen zu Berlin, Dorothea Kober, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
           </repeatableGroupItem>
@@ -442,10 +454,10 @@
               <formattedValue language="de">5</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>Matthias Withoos must have seen this drawing, since he integrated the fountain into his &lt;i&gt;Antique Capriccio&lt;/i&gt; and copied it accurately even down to such imperfections as the broken-off legs of the sphinx. Van Heemskerck’s sketch is the only known pictorial  documentation of the fountain.</value>
+              <value>Matthias Withoos must have seen this drawing, since he integrated the fountain into his &lt;i&gt;Antique Capriccio&lt;/i&gt; and copied it accurately even down to such imperfections as the broken-off legs of the sphinx. Van Havelaar’s sketch is the only known pictorial  documentation of the fountain.</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Matthias Withoos must have seen this drawing, since he integrated the fountain into his Antique Capriccio and copied it accurately even down to such imperfections as the broken-off legs of the sphinx. Van Heemskerck’s sketch is the only known pictorial&amp;nbsp; documentation of the fountain.</value>
+              <value>Matthias Withoos must have seen this drawing, since he integrated the fountain into his Antique Capriccio and copied it accurately even down to such imperfections as the broken-off legs of the sphinx. Van Havelaar’s sketch is the only known pictorial&amp;nbsp; documentation of the fountain.</value>
             </dataField>
             <dataField dataType="Date" name="DateDat">
               <value>2024-04-04</value>
@@ -468,12 +480,12 @@
             </vocabularyReference>
             <moduleReference name="AddressRef" targetModule="Address" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="757082">
-                <formattedValue language="de">Tatjana Bartsch, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
+                <formattedValue language="de">Tabea Brandt, Bibliotheca Hertziana - Max-Planck-Institut für Kunstgeschichte, Rom</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
             <moduleReference name="ExhibitionRef" targetModule="Exhibition" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="297803">
-                <formattedValue language="de">Heemskerck, Kupferstichkabinett, Staatliche Museen zu Berlin, Dagmar Korbacher, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
+                <formattedValue language="de">Havelaar, Kupferstichkabinett, Staatliche Museen zu Berlin, Dorothea Kober, Berlin, 26.04.2024 - 04.08.2024</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
           </repeatableGroupItem>
@@ -505,7 +517,7 @@
         <repeatableGroup name="ObjAcquisitionNotesGrp" size="1">
           <repeatableGroupItem id="62416633">
             <dataField dataType="Clob" name="MemoClb">
-              <value>1886 vom Ministerium der geistlichen, Unterrichts- und Medizinalangelegenheiten überwiesen, erworben mit der Sammlung Hippolyte Destailleur</value>
+              <value>1886 vom Ministerium der geistlichen, Unterrichts- und Medizinalangelegenheiten überwiesen, erworben mit der Sammlung Hippolyte Delaunay</value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
@@ -984,7 +996,7 @@
             <formattedValue language="de">Michaelis 1891</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="1036396" seqNo="3">
-            <formattedValue language="de">Objekt: Ausst.-Kat. Berlin 2024 (Heemskerck), S. S. 122, 277, Abb. S. Abb. S. 121, 277, Kat.-Nr. Kat.-Nr. 26.124</formattedValue>
+            <formattedValue language="de">Objekt: Ausst.-Kat. Berlin 2024 (Havelaar), S. S. 122, 277, Abb. S. Abb. S. 121, 277, Kat.-Nr. Kat.-Nr. 26.124</formattedValue>
             <dataField dataType="Varchar" name="CatalogueNumberTxt">
               <value>Kat.-Nr. 26.124</value>
             </dataField>
@@ -1086,7 +1098,7 @@
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="5996296" seqNo="5">
-            <formattedValue language="de">Mailkorrespondenz, KK_Bildanfrage_Heemskerck_Amersfoort.pdf</formattedValue>
+            <formattedValue language="de">Mailkorrespondenz, KK_Bildanfrage_Havelaar_Amersfoort.pdf</formattedValue>
             <dataField dataType="Boolean" name="ExportBoo">
               <value>false</value>
               <formattedValue language="de">nein</formattedValue>
@@ -1249,7 +1261,7 @@
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="350397" seqNo="18">
-            <formattedValue language="de">KK_Heemskerck_Kleines Skizzenbuch</formattedValue>
+            <formattedValue language="de">KK_Havelaar_Kleines Skizzenbuch</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>145</value>
               <formattedValue language="de">145</formattedValue>
@@ -1263,7 +1275,7 @@
         </moduleReference>
         <moduleReference name="ObjPerAssociationRef" targetModule="Person" multiplicity="M:N" size="1">
           <moduleReferenceItem moduleItemId="194172" seqNo="0">
-            <formattedValue language="de">Ausführung: Maarten van Heemskerck (1498 - 1574), Zeichner*in</formattedValue>
+            <formattedValue language="de">Ausführung: Maarten van Havelaar (1498 - 1574), Zeichner*in</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
               <formattedValue language="de">1</formattedValue>
@@ -1282,52 +1294,52 @@
         </moduleReference>
         <moduleReference name="ObjOwnership001Ref" targetModule="Ownership" multiplicity="M:N" size="11">
           <moduleReferenceItem moduleItemId="321276" seqNo="0">
-            <formattedValue language="de">Hippolyte Destailleur (1822-1893), 1879</formattedValue>
+            <formattedValue language="de">Hippolyte Delaunay (1822-1893), 1879</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485268" seqNo="1">
-            <formattedValue language="de">Jacob Rauwaert (1530-1597), 1574</formattedValue>
+            <formattedValue language="de">Jacob Ravestijn (1530-1597), 1574</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485269" seqNo="2">
-            <formattedValue language="de">Cornelis van Haarlem (1562-1638), 11.11.1638</formattedValue>
+            <formattedValue language="de">Cornelis van Halder (1562-1638), 11.11.1638</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485270" seqNo="3">
-            <formattedValue language="de">Pieter Jansz. Bagijn (1600/1605-1648), 11.11.1638–1639</formattedValue>
+            <formattedValue language="de">Pieter Jansz. Bakker (1600/1605-1648), 11.11.1638–1639</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485271" seqNo="4">
-            <formattedValue language="de">Pieter Saenredam (1597-1665), 1639–1665</formattedValue>
+            <formattedValue language="de">Pieter Sandvoort (1597-1665), 1639–1665</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551268" seqNo="5">
-            <formattedValue language="de">Maarten van Heemskerck (1498-1574), 1532/36-1574</formattedValue>
+            <formattedValue language="de">Maarten van Havelaar (1498-1574), 1532/36-1574</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551269" seqNo="6">
-            <formattedValue language="de">Pierre Crozat (1661-1740), bis 10.4./13.5.1741</formattedValue>
+            <formattedValue language="de">Pierre Corbin (1661-1740), bis 10.4./13.5.1741</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551270" seqNo="7">
-            <formattedValue language="de">Kauf: Robert Hecquet (1693-1775), 1741–1741</formattedValue>
+            <formattedValue language="de">Kauf: Robert Hacquart (1693-1775), 1741–1741</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551271" seqNo="8">
-            <formattedValue language="de">Kauf: Pierre Jean Mariette (1694-1774), 1741-15.11.1775/30.1.1776</formattedValue>
+            <formattedValue language="de">Kauf: Pierre Jean Marot (1694-1774), 1741-15.11.1775/30.1.1776</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551272" seqNo="9">
-            <formattedValue language="de">Kauf: Antoine Bourlat de Montredon (-1777), 1775–16.3.1778</formattedValue>
+            <formattedValue language="de">Kauf: Antoine Bourdon de Montfort (-1777), 1775–16.3.1778</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551276" seqNo="10">
-            <formattedValue language="de">Kauf: Desmarets, 16.3.1778</formattedValue>
+            <formattedValue language="de">Kauf: Desfossés, 16.3.1778</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <moduleReference name="ObjRegistrarRef" targetModule="Registrar" multiplicity="1:N" size="2">
           <moduleReferenceItem moduleItemId="759253" seqNo="0">
-            <formattedValue language="de">2024-11-19, Positiv, Heemskerck, Kupferstichkabinett, Staatliche Museen zu Berlin, Dagmar Korbacher, Berlin, 26.04.2024 - 04.08.2024, 79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+            <formattedValue language="de">2024-11-19, Positiv, Havelaar, Kupferstichkabinett, Staatliche Museen zu Berlin, Dorothea Kober, Berlin, 26.04.2024 - 04.08.2024, 79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="1335413" seqNo="1">
-            <formattedValue language="de">2025-04-25, Positiv, Il fascino di Roma, Istituto centrale per la Grafica, Maura Picciau, Rom, 02.03.2026 - 07.06.2026, 79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+            <formattedValue language="de">2025-04-25, Positiv, Il fascino di Roma, Istituto centrale per la Grafica, Marina Pisoni, Rom, 02.03.2026 - 07.06.2026, 79 D 2, fol. 23 recto, Zeichnung / Seite, Päpstlicher Statuenhof und Brunnenmonument, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <composite name="ObjObjectCre">
           <compositeItem seqNo="0">
             <moduleReference name="ObjObjectBRef" targetModule="Object" multiplicity="M:N" size="1">
               <moduleReferenceItem moduleItemId="1591278" seqNo="0">
-                <formattedValue language="de">Teil von: 79 D 2, Skizzenbuch, Römisches Skizzenbuch I, mit 76 Seiten (ehemals Klebeband mit eingefügten Skizzenbuchblättern, seit der Ausstellung 2024 einzeln bzw. in Passepartouts aufbewahrt), um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+                <formattedValue language="de">Teil von: 79 D 2, Skizzenbuch, Römisches Skizzenbuch I, mit 76 Seiten (ehemals Klebeband mit eingefügten Skizzenbuchblättern, seit der Ausstellung 2024 einzeln bzw. in Passepartouts aufbewahrt), um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
                 <vocabularyReference name="TypeAVoc" id="30413" instanceName="ObjObjectTypeVgr">
                   <vocabularyReferenceItem id="4399773" name="Umfasst">
                     <formattedValue language="de">Umfasst</formattedValue>
@@ -1434,19 +1446,19 @@
           <value>um 1532 - 1536</value>
         </virtualField>
         <virtualField name="ObjPerAssociationSmallestVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjDashboardPublicationStatusVrt">
           <value>Freigegeben</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantNameVrt">
-          <value>Heemskerck, Maarten van</value>
+          <value>Havelaar, Maarten van</value>
         </virtualField>
         <virtualField name="ObjObjectNumberSortedVrt">
           <value>79 D 2, fol. 072 recto</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjMaterialTechniqueVrt">
           <value>Feder in Braun, Stege horizontal, Hilfssteg vorhanden, Siebseite, blauer Schnitt r., u., Nase o. r., Falz l., ehemaliges Recto, kleines Skizzenbuch, abgeriffene Ecke u. r., Zickzackfalte vertikal durch die Skulptur, hellbraune Faser liegt auf u. M., direkt auf Kontur, unten faltig (Randbereich des Papiers? Verhältnis zum WZ?), evtl. Trocknungsmarke, brauner Fleck (Klebstoff?, aufliegend) vor dem Kopf, Tinte verblasst unter Einfluss von Feuchtigkeit</value>
@@ -1503,10 +1515,10 @@
           <value>Unterer Statuenhof der Casa Gallo</value>
         </virtualField>
         <virtualField name="ObjObjectVrt">
-          <value>79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</value>
+          <value>79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjPerAssociationVrt">
-          <value>Maarten van Heemskerck (1498 - 1574)</value>
+          <value>Maarten van Havelaar (1498 - 1574)</value>
         </virtualField>
         <virtualField name="ObjObjectNumberVrt">
           <value>79 D 2, fol. 72 recto</value>
@@ -1595,10 +1607,10 @@
         <repeatableGroup name="ObjTextGrp" size="2">
           <repeatableGroupItem id="43657663">
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>&lt;div&gt;Die beiden sogenannten Römischen Skizzenbücher Maarten van Heemskercks sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Heemskerck gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Regier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Heemskercks spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)&lt;/div&gt;</value>
+              <value>&lt;div&gt;Die beiden sogenannten Römischen Skizzenbücher Maarten van Havelaars sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Havelaar gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Regier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Havelaars spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)&lt;/div&gt;</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Die beiden sogenannten Römischen Skizzenbücher Maarten van Heemskercks sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Heemskerck gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Regier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Heemskercks spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.
+              <value>Die beiden sogenannten Römischen Skizzenbücher Maarten van Havelaars sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Havelaar gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Regier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Havelaars spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.
 
 Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)</value>
             </dataField>
@@ -1730,10 +1742,10 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
               <formattedValue language="de">5</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>&lt;div&gt;Die beiden sogenannten Römischen Skizzenbücher Maarten van Heemskercks sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Heemskerck gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Rogier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Heemskercks spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)&lt;/div&gt;</value>
+              <value>&lt;div&gt;Die beiden sogenannten Römischen Skizzenbücher Maarten van Havelaars sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Havelaar gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Rogier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Havelaars spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)&lt;/div&gt;</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Die beiden sogenannten Römischen Skizzenbücher Maarten van Heemskercks sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Heemskerck gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Rogier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Heemskercks spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.
+              <value>Die beiden sogenannten Römischen Skizzenbücher Maarten van Havelaars sind nicht nur auf unterschiedlichen Wegen und zu verschiedenen Zeiten nach Berlin gelangt, sie sind auch sehr verschiedener Natur. Allein das nach seinem früheren Erwerbungsjahr als erster Band bezeichnete ist im eigentlichen Sinn ein Skizzenbuch, nämlich ein bei Ausflügen des Künstlers in der Tasche mitgeführtes Heft gewesen, das andere dagegen ein Klebeband, also eine nachträgliche Zusammenstellung. Havelaar gehört keineswegs zu den ersten niederländischen Künstlern, die Rom besuchten. Zu seinen Vorgängern zählen Rogier van der Weyden, Jan Gossaert und sein eigener Lehrer Jan van Scorel. Im Laufe des 16. Jahrhunderts wird das Studium der römischen Altertümer und der zeitgenössischen italienischen Kunst zu einem wesentlichen Aspekt der Ausbildung nicht nur niederländischer Künstler und bleibt dies bis in unser Jahrhundert. Die nicht ganz vollständig gebliebenen, mit späteren Zeichnungen vermischten Blätter des Skizzenbuches beweisen Havelaars spezifische Interessen an den Denkmälern der Ewigen Stadt, die sich neben antiker und moderner Architektur vor allem auf antike Skulptur richteten. So besuchte und zeichnete er eine Reihe von Skulpturengärten und -höfen, in denen die Sammler ihre Bestände aufzustellen pflegten. Umso bemerkenswerter ist bei der aufgeschlagenen Federzeichnung (folio 72r.), die den Skulpturengarten der Casa Galli zeigt, daß hier ein modernes Werk ins Zentrum des Blicks gerückt ist, der Bacchus Michelangelos. Auch in der Aufstellung im Garten scheint es eine zentrale Stellung eingenommen zu haben, was für das Verhältnis der vorbildhaften antiken Fragmente zur zeitgenössischen Kunst, die sich mit ihnen zu messen wagt, höchst aufschlußreich ist.
 
 Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlung, hg. von Alexander Dückers, 2. Auflage,  Berlin 1994, S. 179, Kat. IV.17 (mit weiterer Literatur)</value>
             </dataField>
@@ -1771,7 +1783,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
         <repeatableGroup name="ObjAcquisitionNotesGrp" size="1">
           <repeatableGroupItem id="62416560">
             <dataField dataType="Clob" name="MemoClb">
-              <value>1886 vom Ministerium der geistlichen, Unterrichts- und Medizinalangelegenheiten überwiesen, erworben mit der Sammlung Hippolyte Destailleur</value>
+              <value>1886 vom Ministerium der geistlichen, Unterrichts- und Medizinalangelegenheiten überwiesen, erworben mit der Sammlung Hippolyte Delaunay</value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
@@ -2297,7 +2309,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             </vocabularyReference>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="1036396" seqNo="5">
-            <formattedValue language="de">Objekt: Ausst.-Kat. Berlin 2024 (Heemskerck), S. S. 144-145, 253, Abb. S. Abb. S. 146, 253, Kat.-Nr. Kat.-Nr. 26.42</formattedValue>
+            <formattedValue language="de">Objekt: Ausst.-Kat. Berlin 2024 (Havelaar), S. S. 144-145, 253, Abb. S. Abb. S. 146, 253, Kat.-Nr. Kat.-Nr. 26.42</formattedValue>
             <dataField dataType="Varchar" name="CatalogueNumberTxt">
               <value>Kat.-Nr. 26.42</value>
             </dataField>
@@ -2439,7 +2451,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="6035083" seqNo="5">
-            <formattedValue language="de">Mailkorrespondenz, KK_Bildanfrage_Heemskerck_McEwen_9.9.21.pdf</formattedValue>
+            <formattedValue language="de">Mailkorrespondenz, KK_Bildanfrage_Havelaar_McEwen_9.9.21.pdf</formattedValue>
             <dataField dataType="Boolean" name="ExportBoo">
               <value>false</value>
               <formattedValue language="de">nein</formattedValue>
@@ -2738,7 +2750,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="350397" seqNo="26">
-            <formattedValue language="de">KK_Heemskerck_Kleines Skizzenbuch</formattedValue>
+            <formattedValue language="de">KK_Havelaar_Kleines Skizzenbuch</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>615</value>
               <formattedValue language="de">615</formattedValue>
@@ -2755,7 +2767,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
         </moduleReference>
         <moduleReference name="ObjPerAssociationRef" targetModule="Person" multiplicity="M:N" size="1">
           <moduleReferenceItem moduleItemId="194172" seqNo="0">
-            <formattedValue language="de">Ausführung: Maarten van Heemskerck (1498 - 1574), Zeichner*in</formattedValue>
+            <formattedValue language="de">Ausführung: Maarten van Havelaar (1498 - 1574), Zeichner*in</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
               <formattedValue language="de">1</formattedValue>
@@ -2774,52 +2786,52 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
         </moduleReference>
         <moduleReference name="ObjOwnership001Ref" targetModule="Ownership" multiplicity="M:N" size="11">
           <moduleReferenceItem moduleItemId="321276" seqNo="0">
-            <formattedValue language="de">Hippolyte Destailleur (1822-1893), 1879</formattedValue>
+            <formattedValue language="de">Hippolyte Delaunay (1822-1893), 1879</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485268" seqNo="1">
-            <formattedValue language="de">Jacob Rauwaert (1530-1597), 1574</formattedValue>
+            <formattedValue language="de">Jacob Ravestijn (1530-1597), 1574</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485269" seqNo="2">
-            <formattedValue language="de">Cornelis van Haarlem (1562-1638), 11.11.1638</formattedValue>
+            <formattedValue language="de">Cornelis van Halder (1562-1638), 11.11.1638</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485270" seqNo="3">
-            <formattedValue language="de">Pieter Jansz. Bagijn (1600/1605-1648), 11.11.1638–1639</formattedValue>
+            <formattedValue language="de">Pieter Jansz. Bakker (1600/1605-1648), 11.11.1638–1639</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="485271" seqNo="4">
-            <formattedValue language="de">Pieter Saenredam (1597-1665), 1639–1665</formattedValue>
+            <formattedValue language="de">Pieter Sandvoort (1597-1665), 1639–1665</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551268" seqNo="5">
-            <formattedValue language="de">Maarten van Heemskerck (1498-1574), 1532/36-1574</formattedValue>
+            <formattedValue language="de">Maarten van Havelaar (1498-1574), 1532/36-1574</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551269" seqNo="6">
-            <formattedValue language="de">Pierre Crozat (1661-1740), bis 10.4./13.5.1741</formattedValue>
+            <formattedValue language="de">Pierre Corbin (1661-1740), bis 10.4./13.5.1741</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551270" seqNo="7">
-            <formattedValue language="de">Kauf: Robert Hecquet (1693-1775), 1741–1741</formattedValue>
+            <formattedValue language="de">Kauf: Robert Hacquart (1693-1775), 1741–1741</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551271" seqNo="8">
-            <formattedValue language="de">Kauf: Pierre Jean Mariette (1694-1774), 1741-15.11.1775/30.1.1776</formattedValue>
+            <formattedValue language="de">Kauf: Pierre Jean Marot (1694-1774), 1741-15.11.1775/30.1.1776</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551272" seqNo="9">
-            <formattedValue language="de">Kauf: Antoine Bourlat de Montredon (-1777), 1775–16.3.1778</formattedValue>
+            <formattedValue language="de">Kauf: Antoine Bourdon de Montfort (-1777), 1775–16.3.1778</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="551276" seqNo="10">
-            <formattedValue language="de">Kauf: Desmarets, 16.3.1778</formattedValue>
+            <formattedValue language="de">Kauf: Desfossés, 16.3.1778</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <moduleReference name="ObjRegistrarRef" targetModule="Registrar" multiplicity="1:N" size="2">
           <moduleReferenceItem moduleItemId="759289" seqNo="0">
-            <formattedValue language="de">2024-11-19, Positiv, Heemskerck, Kupferstichkabinett, Staatliche Museen zu Berlin, Dagmar Korbacher, Berlin, 26.04.2024 - 04.08.2024, 79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+            <formattedValue language="de">2024-11-19, Positiv, Havelaar, Kupferstichkabinett, Staatliche Museen zu Berlin, Dorothea Kober, Berlin, 26.04.2024 - 04.08.2024, 79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="1335443" seqNo="1">
-            <formattedValue language="de">2025-04-25, Positiv, Il fascino di Roma, Istituto centrale per la Grafica, Maura Picciau, Rom, 02.03.2026 - 07.06.2026, 79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+            <formattedValue language="de">2025-04-25, Positiv, Il fascino di Roma, Istituto centrale per la Grafica, Marina Pisoni, Rom, 02.03.2026 - 07.06.2026, 79 D 2, fol. 72 recto, Zeichnung / Seite, Unterer Statuenhof der Casa Gallo, um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <composite name="ObjObjectCre">
           <compositeItem seqNo="0">
             <moduleReference name="ObjObjectARef" targetModule="Object" multiplicity="M:N" size="1">
               <moduleReferenceItem moduleItemId="1591278" seqNo="0">
-                <formattedValue language="de">Teil von: 79 D 2, Skizzenbuch, Römisches Skizzenbuch I, mit 76 Seiten (ehemals Klebeband mit eingefügten Skizzenbuchblättern, seit der Ausstellung 2024 einzeln bzw. in Passepartouts aufbewahrt), um 1532 - 1536, Maarten van Heemskerck (1498 - 1574)</formattedValue>
+                <formattedValue language="de">Teil von: 79 D 2, Skizzenbuch, Römisches Skizzenbuch I, mit 76 Seiten (ehemals Klebeband mit eingefügten Skizzenbuchblättern, seit der Ausstellung 2024 einzeln bzw. in Passepartouts aufbewahrt), um 1532 - 1536, Maarten van Havelaar (1498 - 1574)</formattedValue>
                 <vocabularyReference name="TypeAVoc" id="30413" instanceName="ObjObjectTypeVgr">
                   <vocabularyReferenceItem id="4399771" name="http://terminology.lido-schema.org/lido00574">
                     <formattedValue language="de">Teil von</formattedValue>
@@ -2928,19 +2940,19 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
           <value>1638-1642</value>
         </virtualField>
         <virtualField name="ObjPerAssociationSmallestVrt">
-          <value>David Teniers (der Jüngere) (1610 - 1690)</value>
+          <value>David Tielens (der Jüngere) (1610 - 1690)</value>
         </virtualField>
         <virtualField name="ObjDashboardPublicationStatusVrt">
           <value>Freigegeben</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantNameVrt">
-          <value>Teniers, David (der Jüngere)</value>
+          <value>Tielens, David (der Jüngere)</value>
         </virtualField>
         <virtualField name="ObjObjectNumberSortedVrt">
           <value>KdZ 012024</value>
         </virtualField>
         <virtualField name="ObjPerAssociationMainParticipantVrt">
-          <value>David Teniers (der Jüngere) (1610 - 1690)</value>
+          <value>David Tielens (der Jüngere) (1610 - 1690)</value>
         </virtualField>
         <virtualField name="ObjMaterialTechniqueVrt">
           <value>Graphitstift, Papier (vergé), Stege vertikal, Bleistift</value>
@@ -2997,10 +3009,10 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
           <value>Figurenstudien: Tanzende und Bogenschützen</value>
         </virtualField>
         <virtualField name="ObjObjectVrt">
-          <value>KdZ 12024, Zeichnung, Figurenstudien: Tanzende und Bogenschützen, 1638-1642, David Teniers (der Jüngere) (1610 - 1690)</value>
+          <value>KdZ 12024, Zeichnung, Figurenstudien: Tanzende und Bogenschützen, 1638-1642, David Tielens (der Jüngere) (1610 - 1690)</value>
         </virtualField>
         <virtualField name="ObjPerAssociationVrt">
-          <value>David Teniers (der Jüngere) (1610 - 1690)</value>
+          <value>David Tielens (der Jüngere) (1610 - 1690)</value>
         </virtualField>
         <virtualField name="ObjObjectNumberVrt">
           <value>KdZ 12024</value>
@@ -3281,10 +3293,10 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
               <formattedValue language="de">1</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>&lt;div&gt;Auf diesem zauberhaften, beidseitig genutzten Blatt versammelte Teniers sorgfältig beobachtete und sicher gezeichnete Figurenstudien, die er in verschiedenen Gemälden verwendete. &lt;/div&gt;&lt;div&gt;Die tanzende Frau oben links findet sich in der &lt;i&gt;Flämischen Kirmes&lt;/i&gt; von 1640 (Gemäldegalerie Berlin, Inv.Nr. 866C) wieder, auf der ein Paar ausgelassen zur Musik der Drehleier tanzt. Den mit dem Bogen zielenden Mann nutzte Teniers als Vorlage für den ebenso stehenden Schützen im Gemälde &lt;i&gt;Bauern beim Bogenschießen&lt;/i&gt; (um 1645, National Gallery, London) und für den &lt;i&gt;Bogenschießwettbewerb &lt;/i&gt;(1645, Museo del Prado, Madrid). Auch eine Radierung von Teniers eigener Hand greift das Thema auf. Die Figurenstudien sind ungeheuer lebendig gezeichnet, die Linienzüge kraftvoll. Schraffuren geben Schatten, Akzente klären die Formen. Einzelne Hände werden zur genauen Erfassung wiederholt. &lt;/div&gt;&lt;div&gt;Die Pilger auf der Rückseite sind ebenfalls nach dem Leben gezeichnet. Sorgsam konzentrierte sich Teniers auch auf die Details wie die Pilgerabzeichen an den Hüten oder die mitgeführten Devotionalien. Das Studienblatt verdeutlicht, wie intensiv Teniers Alltagsszenen und Ereignisse in seiner Umgebung beobachtete und lebensnah wiedergab.&lt;/div&gt;</value>
+              <value>&lt;div&gt;Auf diesem zauberhaften, beidseitig genutzten Blatt versammelte Tielens sorgfältig beobachtete und sicher gezeichnete Figurenstudien, die er in verschiedenen Gemälden verwendete. &lt;/div&gt;&lt;div&gt;Die tanzende Frau oben links findet sich in der &lt;i&gt;Flämischen Kirmes&lt;/i&gt; von 1640 (Gemäldegalerie Berlin, Inv.Nr. 866C) wieder, auf der ein Paar ausgelassen zur Musik der Drehleier tanzt. Den mit dem Bogen zielenden Mann nutzte Tielens als Vorlage für den ebenso stehenden Schützen im Gemälde &lt;i&gt;Bauern beim Bogenschießen&lt;/i&gt; (um 1645, National Gallery, London) und für den &lt;i&gt;Bogenschießwettbewerb &lt;/i&gt;(1645, Museo del Prado, Madrid). Auch eine Radierung von Tielens eigener Hand greift das Thema auf. Die Figurenstudien sind ungeheuer lebendig gezeichnet, die Linienzüge kraftvoll. Schraffuren geben Schatten, Akzente klären die Formen. Einzelne Hände werden zur genauen Erfassung wiederholt. &lt;/div&gt;&lt;div&gt;Die Pilger auf der Rückseite sind ebenfalls nach dem Leben gezeichnet. Sorgsam konzentrierte sich Tielens auch auf die Details wie die Pilgerabzeichen an den Hüten oder die mitgeführten Devotionalien. Das Studienblatt verdeutlicht, wie intensiv Tielens Alltagsszenen und Ereignisse in seiner Umgebung beobachtete und lebensnah wiedergab.&lt;/div&gt;</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>Auf diesem zauberhaften, beidseitig genutzten Blatt versammelte Teniers sorgfältig beobachtete und sicher gezeichnete Figurenstudien, die er in verschiedenen Gemälden verwendete.&amp;nbsp;Die tanzende Frau oben links findet sich in der Flämischen Kirmes&amp;nbsp;von 1640 (Gemäldegalerie Berlin, Inv.Nr. 866C) wieder, auf der ein Paar ausgelassen zur Musik der Drehleier tanzt. Den mit dem Bogen zielenden Mann nutzte Teniers als Vorlage für den ebenso stehenden Schützen im Gemälde Bauern beim Bogenschießen (um 1645, National Gallery, London) und für den Bogenschießwettbewerb (1645, Museo del Prado, Madrid). Auch eine Radierung von Teniers eigener Hand greift das Thema auf. Die Figurenstudien sind ungeheuer lebendig gezeichnet, die Linienzüge kraftvoll. Schraffuren geben Schatten, Akzente klären die Formen. Einzelne Hände werden zur genauen Erfassung wiederholt.&amp;nbsp;Die Pilger auf der Rückseite sind ebenfalls nach dem Leben gezeichnet. Sorgsam konzentrierte sich Teniers auch auf die Details wie die Pilgerabzeichen an den Hüten oder die mitgeführten Devotionalien. Das Studienblatt verdeutlicht, wie intensiv Teniers Alltagsszenen und Ereignisse in seiner Umgebung beobachtete und lebensnah wiedergab.</value>
+              <value>Auf diesem zauberhaften, beidseitig genutzten Blatt versammelte Tielens sorgfältig beobachtete und sicher gezeichnete Figurenstudien, die er in verschiedenen Gemälden verwendete.&amp;nbsp;Die tanzende Frau oben links findet sich in der Flämischen Kirmes&amp;nbsp;von 1640 (Gemäldegalerie Berlin, Inv.Nr. 866C) wieder, auf der ein Paar ausgelassen zur Musik der Drehleier tanzt. Den mit dem Bogen zielenden Mann nutzte Tielens als Vorlage für den ebenso stehenden Schützen im Gemälde Bauern beim Bogenschießen (um 1645, National Gallery, London) und für den Bogenschießwettbewerb (1645, Museo del Prado, Madrid). Auch eine Radierung von Tielens eigener Hand greift das Thema auf. Die Figurenstudien sind ungeheuer lebendig gezeichnet, die Linienzüge kraftvoll. Schraffuren geben Schatten, Akzente klären die Formen. Einzelne Hände werden zur genauen Erfassung wiederholt.&amp;nbsp;Die Pilger auf der Rückseite sind ebenfalls nach dem Leben gezeichnet. Sorgsam konzentrierte sich Tielens auch auf die Details wie die Pilgerabzeichen an den Hüten oder die mitgeführten Devotionalien. Das Studienblatt verdeutlicht, wie intensiv Tielens Alltagsszenen und Ereignisse in seiner Umgebung beobachtete und lebensnah wiedergab.</value>
             </dataField>
             <dataField dataType="Date" name="DateDat">
               <value>2026-09-17</value>
@@ -3307,7 +3319,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             </vocabularyReference>
             <moduleReference name="AddressRef" targetModule="Address" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="404081">
-                <formattedValue language="de">Christien Melzer, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin</formattedValue>
+                <formattedValue language="de">Clara Menzinger, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
             <moduleReference name="ExhibitionRef" targetModule="Exhibition" multiplicity="N:1" size="1">
@@ -3322,10 +3334,10 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
               <formattedValue language="de">5</formattedValue>
             </dataField>
             <dataField dataType="Clob" name="TextHTMLClb">
-              <value>This enchanting sheet, drawn on both sides, is covered with carefully observed, confidently rendered figure studies. Teniers used them in various paintings; the dancing woman at the top left appears in the &lt;i&gt;Flemish Fair &lt;/i&gt;of 1640, which shows a couple dancing exuberantly to the music of a hurdy-gurdy.</value>
+              <value>This enchanting sheet, drawn on both sides, is covered with carefully observed, confidently rendered figure studies. Tielens used them in various paintings; the dancing woman at the top left appears in the &lt;i&gt;Flemish Fair &lt;/i&gt;of 1640, which shows a couple dancing exuberantly to the music of a hurdy-gurdy.</value>
             </dataField>
             <dataField dataType="Clob" name="TextClb">
-              <value>This enchanting sheet, drawn on both sides, is covered with carefully observed, confidently rendered figure studies. Teniers used them in various paintings; the dancing woman at the top left appears in the Flemish Fair of 1640, which shows a couple dancing exuberantly to the music of a hurdy-gurdy.</value>
+              <value>This enchanting sheet, drawn on both sides, is covered with carefully observed, confidently rendered figure studies. Tielens used them in various paintings; the dancing woman at the top left appears in the Flemish Fair of 1640, which shows a couple dancing exuberantly to the music of a hurdy-gurdy.</value>
             </dataField>
             <dataField dataType="Date" name="DateDat">
               <value>2026-09-17</value>
@@ -3348,7 +3360,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             </vocabularyReference>
             <moduleReference name="AddressRef" targetModule="Address" multiplicity="N:1" size="1">
               <moduleReferenceItem moduleItemId="404081">
-                <formattedValue language="de">Christien Melzer, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin</formattedValue>
+                <formattedValue language="de">Clara Menzinger, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin</formattedValue>
               </moduleReferenceItem>
             </moduleReference>
             <moduleReference name="ExhibitionRef" targetModule="Exhibition" multiplicity="N:1" size="1">
@@ -3392,7 +3404,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
         <repeatableGroup name="ObjAcquisitionNotesGrp" size="1">
           <repeatableGroupItem id="66081615">
             <dataField dataType="Clob" name="MemoClb">
-              <value>1902 von Adolf von Beckerath, Berlin, erworben
+              <value>1902 von Adolf von Bellingroth, Berlin, erworben
 </value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
@@ -3427,7 +3439,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
           </repeatableGroupItem>
           <repeatableGroupItem id="66118768">
             <dataField dataType="Clob" name="CommentClb">
-              <value>Die lebensnahen, kraftvoll gezeichneten Skizzen von tanzenden Frauen und Bogen schießenden Männern lassen sich in mehreren Gemälden und Stichen nach Teniers wiederfinden. </value>
+              <value>Die lebensnahen, kraftvoll gezeichneten Skizzen von tanzenden Frauen und Bogen schießenden Männern lassen sich in mehreren Gemälden und Stichen nach Tielens wiederfinden. </value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
               <value>5</value>
@@ -3447,7 +3459,7 @@ Text: Gero Seelig in: Das Berliner Kupferstichkabinett. Ein Handbuch zur Sammlun
             <dataField dataType="Clob" name="CommentClb">
               <value>Ausst.-Kat. Karlsruhe 2005: reifer Stil, sehr lebendig sind die Bewegungen in der rasch und kraftvoll gezeichneten Studie erfasst; weist bereits di Sicherheit der Strichführung mit nervösen, kurzen Umrisslinien, Schatten gebenden Schraffurlagen und den typischen Verdichtungen zur Akzentsetzung und Klärung der Form auf eine reife Stil, Gemälde in Berliner GG macht Entstehung um 1640 wahrscheinlich. Figuren kehren in Gemälden wieder (Radierung, hg. von van den Wyngaerde, Bilder in Madrid, Prado.
 
-Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessiert sich auch für die Hüte mit den vielen Wallfahrtszeichen, die Berliner Studien machen deutlich, wie intensiv Teniers Alltagsszenen und Ereignisse i seiner Umgebung beobachtet und lebensnah wiedergibt</value>
+Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Tielens interessiert sich auch für die Hüte mit den vielen Wallfahrtszeichen, die Berliner Studien machen deutlich, wie intensiv Tielens Alltagsszenen und Ereignisse i seiner Umgebung beobachtet und lebensnah wiedergibt</value>
             </dataField>
             <dataField dataType="Long" name="SortLnu">
               <value>15</value>
@@ -3525,7 +3537,7 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
           </repeatableGroupItem>
           <repeatableGroupItem id="66093498">
             <dataField dataType="Clob" name="LabelClb">
-              <value>Adolf von Beckerath (Lugt 1612)</value>
+              <value>Adolf von Bellingroth (Lugt 1612)</value>
             </dataField>
             <dataField dataType="Varchar" name="PositionTxt">
               <value>verso u. l.</value>
@@ -3542,7 +3554,7 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
           </repeatableGroupItem>
           <repeatableGroupItem id="66094689">
             <dataField dataType="Clob" name="LabelClb">
-              <value>Thomas Lawrence (Lugt 2445)</value>
+              <value>Thomas Lambourne (Lugt 2445)</value>
             </dataField>
             <dataField dataType="Varchar" name="PositionTxt">
               <value>recto u. l.</value>
@@ -3912,7 +3924,7 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
         </moduleReference>
         <moduleReference name="ObjAcquisitionSourcePerRef" targetModule="Person" multiplicity="N:1" size="1">
           <moduleReferenceItem moduleItemId="401669">
-            <formattedValue language="de">Adolf von Beckerath (1834-1915)</formattedValue>
+            <formattedValue language="de">Adolf von Bellingroth (1834-1915)</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <moduleReference name="ObjLiteratureRef" targetModule="Literature" multiplicity="M:N" size="6">
@@ -3976,9 +3988,9 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
             </vocabularyReference>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="1262404" seqNo="4">
-            <formattedValue language="de">Objekt: Ausst.-Kat. Brüssel 1980, Kat.-Nr. Kat.-Nr. 232, Abb. (M. Klinge, David Teniers II, S. 251-313)</formattedValue>
+            <formattedValue language="de">Objekt: Ausst.-Kat. Brüssel 1980, Kat.-Nr. Kat.-Nr. 232, Abb. (M. Klinge, David Tielens II, S. 251-313)</formattedValue>
             <dataField dataType="Varchar" name="CatalogueNumberTxt">
-              <value>Kat.-Nr. 232, Abb. (M. Klinge, David Teniers II, S. 251-313)</value>
+              <value>Kat.-Nr. 232, Abb. (M. Klinge, David Tielens II, S. 251-313)</value>
             </dataField>
             <vocabularyReference name="TypeVoc" id="30317" instanceName="LitObjectTypeVgr">
               <vocabularyReferenceItem id="30935" name="node_1286">
@@ -4082,7 +4094,7 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
         </moduleReference>
         <moduleReference name="ObjPerAssociationRef" targetModule="Person" multiplicity="M:N" size="1">
           <moduleReferenceItem moduleItemId="214506" seqNo="0">
-            <formattedValue language="de">Ausführung: David Teniers (der Jüngere) (1610 - 1690), Zeichner*in</formattedValue>
+            <formattedValue language="de">Ausführung: David Tielens (der Jüngere) (1610 - 1690), Zeichner*in</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>1</value>
               <formattedValue language="de">1</formattedValue>
@@ -4101,28 +4113,28 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
         </moduleReference>
         <moduleReference name="ObjOwnership001Ref" targetModule="Ownership" multiplicity="M:N" size="4">
           <moduleReferenceItem moduleItemId="157383" seqNo="0">
-            <formattedValue language="de">Samuel Woodburn (1783-1853), 157383</formattedValue>
+            <formattedValue language="de">Samuel Waldron (1783-1853), 157383</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>11</value>
               <formattedValue language="de">11</formattedValue>
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="157384" seqNo="1">
-            <formattedValue language="de">Thomas Lawrence (1769-1830), 157384</formattedValue>
+            <formattedValue language="de">Thomas Lambourne (1769-1830), 157384</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>10</value>
               <formattedValue language="de">10</formattedValue>
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="170484" seqNo="2">
-            <formattedValue language="de">Adolf von Beckerath (1834-1915), bis 1902</formattedValue>
+            <formattedValue language="de">Adolf von Bellingroth (1834-1915), bis 1902</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>16</value>
               <formattedValue language="de">16</formattedValue>
             </dataField>
           </moduleReferenceItem>
           <moduleReferenceItem moduleItemId="974280" seqNo="3">
-            <formattedValue language="de">Auktion Christie's (Samuel Woodburn), 4.-8.6.1860</formattedValue>
+            <formattedValue language="de">Auktion Christie's (Samuel Waldron), 4.-8.6.1860</formattedValue>
             <dataField dataType="Long" name="SortLnu">
               <value>12</value>
               <formattedValue language="de">12</formattedValue>
@@ -4131,14 +4143,14 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
         </moduleReference>
         <moduleReference name="ObjRegistrarRef" targetModule="Registrar" multiplicity="1:N" size="1">
           <moduleReferenceItem moduleItemId="1566432" seqNo="0">
-            <formattedValue language="de">2026-10-10, Vorauswahl, Flämische Zeichnungen, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin, 10.10.2026 - 31.01.2027, KdZ 12024, Zeichnung, Figurenstudien: Tanzende und Bogenschützen, 1638-1642, David Teniers (der Jüngere) (1610 - 1690)</formattedValue>
+            <formattedValue language="de">2026-10-10, Vorauswahl, Flämische Zeichnungen, Kupferstichkabinett, Staatliche Museen zu Berlin, Berlin, 10.10.2026 - 31.01.2027, KdZ 12024, Zeichnung, Figurenstudien: Tanzende und Bogenschützen, 1638-1642, David Tielens (der Jüngere) (1610 - 1690)</formattedValue>
           </moduleReferenceItem>
         </moduleReference>
         <composite name="ObjObjectCre">
           <compositeItem seqNo="0">
             <moduleReference name="ObjObjectARef" targetModule="Object" multiplicity="M:N" size="1">
               <moduleReferenceItem moduleItemId="863149" seqNo="0">
-                <formattedValue language="de">Ausführung: 866C, Gemälde, Flämische Kirmes, 1640, David Teniers (der Jüngere) (1610 - 1690)</formattedValue>
+                <formattedValue language="de">Ausführung: 866C, Gemälde, Flämische Kirmes, 1640, David Tielens (der Jüngere) (1610 - 1690)</formattedValue>
                 <vocabularyReference name="TypeAVoc" id="30413" instanceName="ObjObjectTypeVgr">
                   <vocabularyReferenceItem id="4399725" name="Ausführung">
                     <formattedValue language="de">Ausführung</formattedValue>
@@ -4165,7 +4177,7 @@ Pilger verso: Naturstudien, sorgsam beobachtet, rasche Manier, Teniers interessi
           <compositeItem seqNo="1">
             <moduleReference name="ObjObjectBRef" targetModule="Object" multiplicity="M:N" size="1">
               <moduleReferenceItem moduleItemId="3859517" seqNo="0">
-                <formattedValue language="de">Rückseite: KdZ 12024 verso, Zeichnung / Rückseite, Figurenstudien: Pilger, 1638-1642, David Teniers (der Jüngere) (1610 - 1690)</formattedValue>
+                <formattedValue language="de">Rückseite: KdZ 12024 verso, Zeichnung / Rückseite, Figurenstudien: Pilger, 1638-1642, David Tielens (der Jüngere) (1610 - 1690)</formattedValue>
                 <vocabularyReference name="TypeAVoc" id="30413" instanceName="ObjObjectTypeVgr">
                   <vocabularyReferenceItem id="4399790" name="Vorderseite">
                     <formattedValue language="de">Vorderseite</formattedValue>
