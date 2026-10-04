@@ -15,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -63,6 +64,11 @@ VERB_ARGS: dict[str, tuple[set[str], set[str]]] = {
 
 TS_DAY = r"\d{4}-\d{2}-\d{2}"
 TS_SECONDS = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
+
+# An XML attribute name is an NCName - no colon, so it can never introduce a
+# namespace prefix. Used to keep a bad request argument out of <request> and
+# the response well-formed.
+_XML_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
 
 
 def q(name: str) -> str:
@@ -364,9 +370,19 @@ def error_response(request: ET.Element, exc: ProtocolError, granularity: str) ->
 
 
 def make_request_el(base_url: str, pairs: list[tuple[str, str]]) -> ET.Element:
+    """The <request> element, echoing the arguments actually received.
+
+    Argument names become **XML attribute names**, which are NCNames — no colon.
+    A stray query parameter such as `spk-berlin.de:object-851035` (a missing
+    `identifier=`) turns the colon into an undeclared namespace prefix and the
+    whole response stops being well-formed XML — a harvester fails outright,
+    where it should simply be told badArgument. So a name that is not an NCName
+    is left out of the echo; parse_args still names it in the error message.
+    """
     el = ET.Element(q("request"))
     for key, value in pairs:
-        el.set(key, value)
+        if _XML_NAME.match(key):
+            el.set(key, value)
     el.text = base_url
     return el
 

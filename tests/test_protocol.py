@@ -184,6 +184,36 @@ def test_pretty_print_indents_the_envelope_but_not_the_payload() -> None:
     )
 
 
+def test_an_illegal_argument_name_keeps_the_response_well_formed() -> None:
+    """A query parameter that is not an NCName - e.g. a URL that forgot
+    `identifier=` and used `spk-berlin.de:object-851035` as a bare argument -
+    used to be echoed as an XML attribute name, so the whole response stopped
+    being well-formed XML (undeclared namespace prefix). A harvester fails on
+    that outright; it should just be told badArgument."""
+    from xml.etree import ElementTree as ET
+
+    from oai.protocol import make_request_el, serialise
+
+    pairs = [
+        ("verb", "GetRecord"),
+        ("spk-berlin.de:object-851035", ""),
+        ("metadataPrefix", "oai_dc"),
+    ]
+
+    body = serialise(make_request_el("http://example.org/oai", pairs))
+    root = ET.fromstring(body)  # must not raise
+    assert root.get("verb") == "GetRecord"
+    assert root.get("metadataPrefix") == "oai_dc"
+    # no colon can appear in an echoed attribute name
+    assert all(":" not in name for name in root.attrib)
+
+    # and the offending argument is still named in the error
+    with pytest.raises(ProtocolError) as exc:
+        parse_args(pairs)
+    assert exc.value.code == "badArgument"
+    assert "spk-berlin.de:object-851035" in exc.value.message
+
+
 def test_tampered_token_is_rejected() -> None:
     token = encode_token(state(), SECRET)
     body, _, sig = token.partition(".")
