@@ -13,6 +13,7 @@ import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ENVELOPE_NS = "urn:oai:envelope"
 
@@ -63,6 +64,43 @@ def dotenv_path(config_path: Path | None = None) -> Path:
 
 class ConfigError(Exception):
     """Bad or missing configuration."""
+
+
+# Values shipped in the repo so a local checkout runs out of the box. They are
+# public, so they must never protect a repository reachable off-host.
+PLACEHOLDER_SECRETS = frozenset({"devpass", "dev-token-secret-change-me"})
+
+
+def _host_is_loopback(base_url: str) -> bool:
+    host = (urlsplit(base_url).hostname or "").lower()
+    return host in {"", "localhost", "127.0.0.1", "::1"} or host.startswith("127.")
+
+
+def check_secrets(identity: Identity, basex: BaseXSettings,
+                  protocol: ProtocolSettings) -> None:
+    """Refuse to serve off-host with a shipped placeholder credential.
+
+    The repo stays runnable locally - loopback plus the dev values is fine - but
+    advertising a non-loopback `baseURL` (which harvesters are told to call) with
+    the public placeholders is exactly how a secret leaks: a forged resumption
+    token, or a full read/write REST endpoint. So this is a load-time error, not
+    a note in the docs, in the same spirit as the module-mode/deletedRecord check.
+    """
+    if _host_is_loopback(identity.base_url):
+        return
+    offenders = []
+    if not basex.password or basex.password in PLACEHOLDER_SECRETS:
+        offenders.append("OAI_BASEX_PASSWORD")
+    if not protocol.token_secret or protocol.token_secret in PLACEHOLDER_SECRETS:
+        offenders.append("OAI_TOKEN_SECRET")
+    if offenders:
+        raise ConfigError(
+            f"baseURL {identity.base_url!r} is not loopback, but "
+            + " and ".join(offenders)
+            + " still hold the shipped placeholder values. Set real values (a "
+            "real environment variable, or the .env beside the config) before "
+            "serving off-host - or point baseURL at localhost while developing."
+        )
 
 
 @dataclass(frozen=True)
@@ -584,6 +622,8 @@ class Config:
                 "no [[metadata.formats]] configured: a repository must "
                 "advertise at least one"
             )
+
+        check_secrets(identity, basex, protocol)
 
         return cls(
             identity=identity,

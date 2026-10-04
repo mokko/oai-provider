@@ -122,6 +122,13 @@ Deployment values come from the environment, not the tracked file:
 a gitignored `.env` beside the config (`.env.example` is the template;
 `OAI_ENV_FILE` points elsewhere).
 
+`OAI_TOKEN_SECRET` is the HMAC key that signs resumption tokens; a token *is*
+the paging state (mapping fingerprint, pinned `until`, cursor, counts), so a
+forged one must fail. `OAI_BASEX_PASSWORD` is the BaseX user's password. The
+config **refuses to start** if `baseURL` is not loopback while either still holds
+the shipped placeholder — a public checkout must never protect a reachable
+repository. Loopback (the default) keeps the dev values working.
+
 ## Test
 
 ```bash
@@ -136,8 +143,7 @@ a gitignored `.env` beside the config (`.env.example` is the template;
   Saxon).
 - Module mode is the deployment path: `sync_Object` / `sync_Person` /
   `sync_Multimedia`, `deletedRecord = "no"`.
-- Not done: an index/seek for large collections; a real secrets story (both
-  secrets are dev placeholders).
+- Not done: an index/seek for large collections (see `todo/index.md`).
 
 ## Where to read more
 

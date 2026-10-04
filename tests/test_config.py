@@ -148,3 +148,33 @@ def test_deleted_record_policy_reaches_the_reconcile_query(config: Config) -> No
     q = QueryBuilder(config.mapping).reconcile_query()
     assert "db:delete($db, db:path($d))" in q
     assert 'env:status="deleted"' in q
+
+
+# -- the off-host placeholder guard ----------------------------------------
+
+
+def test_placeholder_secrets_are_refused_offhost(monkeypatch) -> None:
+    """The repo runs locally with the shipped placeholders, but advertising a
+    non-loopback baseURL (which harvesters are told to call) with them is a
+    load-time error, not a note in the docs."""
+    monkeypatch.setenv("OAI_BASE_URL", "http://example.org/oai")
+    monkeypatch.setenv("OAI_BASEX_PASSWORD", "devpass")
+    monkeypatch.setenv("OAI_TOKEN_SECRET", "dev-token-secret-change-me")
+    with pytest.raises(ConfigError, match="placeholder"):
+        Config.load(ROOT / "oai.toml")
+
+
+def test_placeholder_secrets_are_fine_on_loopback(monkeypatch) -> None:
+    monkeypatch.setenv("OAI_BASE_URL", "http://localhost:8000/oai")
+    monkeypatch.setenv("OAI_BASEX_PASSWORD", "devpass")
+    monkeypatch.setenv("OAI_TOKEN_SECRET", "dev-token-secret-change-me")
+    cfg = Config.load(ROOT / "oai.toml")
+    assert cfg.identity.base_url == "http://localhost:8000/oai"
+
+
+def test_real_secrets_allow_an_offhost_baseurl(monkeypatch) -> None:
+    monkeypatch.setenv("OAI_BASE_URL", "https://museum.example.org/oai")
+    monkeypatch.setenv("OAI_BASEX_PASSWORD", "a-real-password")
+    monkeypatch.setenv("OAI_TOKEN_SECRET", "a-real-token-secret")
+    cfg = Config.load(ROOT / "oai.toml")
+    assert cfg.identity.base_url == "https://museum.example.org/oai"
