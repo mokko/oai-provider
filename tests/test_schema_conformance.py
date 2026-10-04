@@ -9,7 +9,8 @@ nothing in the suite objected because nothing checked *shape*.
 Everything here is validated against the **vendored, unmodified** schemas in
 `data/` (provenance and hashes in `data/SOURCES.md`), using `xmlschema`. Not
 lxml: `xmlschema` is pure Python, so this runs anywhere the rest of the suite
-does. (LIDO is the exception — see the last test.)
+does. (LIDO *content* is the one thing left unvalidated — see the last test and
+`todo/lido-validation.md`.)
 
 Why the strictness differs per format: `<metadata>` is
 `<any namespace="##other" processContents="strict"/>`, so a strict processor
@@ -27,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import re
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -176,13 +178,24 @@ def test_the_ria_payload_is_valid_zetcom_module_xml(live: Config, an_identifier)
     schema.validate(ET.tostring(app, encoding="unicode"))
 
 
-def test_the_lido_schema_is_not_usable_by_xmlschema() -> None:
-    """Pinned so the gap is a recorded reason rather than an oversight.
+def test_lido_content_is_not_validated_yet() -> None:
+    """A recorded gap, not an oversight: LIDO records are envelope-checked only.
 
-    LIDO 1.0's schema imports a 2001-era `xml.xsd` and GML over plain http, and
-    xmlschema rejects it outright for an illegal GML-derived restriction. If a
-    future xmlschema can load it, this fails and LIDO content validation can be
-    switched on. See data/SOURCES.md.
+    The vendored schema imports `xml.xsd` and GML 3.1.1 over **plain http**, so
+    loading it reaches for the GML tree and its transitive imports — a moving
+    network dependency a test suite should not carry. Note *where* it fails: the
+    type involved lives in GML, not in LIDO, so this says nothing about our
+    payload either way. Repointing those two imports at local copies makes it
+    load and our payload validate (verified, with this same validator and with
+    lxml) — see `todo/lido-validation.md`.
     """
-    with pytest.raises(Exception):
-        xmlschema.XMLSchema(str(DATA / "lido" / "lido-v1.0.xsd"))
+    text = (DATA / "lido" / "lido-v1.0.xsd").read_text(encoding="utf-8")
+    assert 'schemaLocation="http://www.w3.org/2001/03/xml.xsd"' in text
+    assert 'schemaLocation="http://schemas.opengis.net' in text
+    # and nothing in LIDO itself derives from a GML type - only these three
+    # element references, which is why an element-only stub is enough
+    referenced = sorted(
+        {m for m in re.findall(r"gml:([A-Za-z]+)", text)}
+    )
+    assert referenced == ["LineString", "Point", "Polygon"], referenced
+    assert "DefinitionType" not in text

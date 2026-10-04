@@ -38,10 +38,13 @@ Also referenced, not vendored: `search_1_6.xsd`, `search_1_8.xsd`,
 
 ## LIDO — `data/lido/`
 
-Vendored with the zml2lido drop, not for validation: see AGENTS.md for why
-**xmlschema cannot load it** (a 2001-era `xml.xsd` import, GML fetched over
-plain http, and an illegal GML-derived restriction). lxml compiles it given two
-local imports; the test suite deliberately avoids lxml.
+Vendored with the zml2lido drop. **Not used for validation as it stands**: it
+imports `xml.xsd` (a 2001-era URL) and GML 3.1.1 over plain http, so loading it
+fetches the GML tree — and the type xmlschema then rejects lives in **GML, not in
+LIDO**, so that failure says nothing about our output either way. Repointing the
+two imports at local copies (the current `xml.xsd`, plus a stub for the three GML
+elements LIDO actually references) makes it load and our payload validate, under
+xmlschema and without lxml. Not enabled — see `todo/lido-validation.md`.
 
 ## Hashes (sha256)
 

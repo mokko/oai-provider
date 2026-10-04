@@ -205,12 +205,17 @@ that is what makes the formats differ:
   schema declares — the same shape the ingest stores. Relaxing the wildcard is
   not a free pass; it is used only where nothing could resolve, and that payload
   is validated anyway.
-- **`lido`** — envelope only: `xmlschema` cannot load LIDO 1.0's schema at all
-  (a 2001-era `xml.xsd` import at a dead-shaped URL, GML imported over plain
-  http, and an illegal GML-derived restriction it refuses outright). lxml *does*
-  compile it, given a local `xml.xsd` and something for GML — a 3-element stub is
-  enough, because the schema references only `gml:Point`, `gml:LineString` and
-  `gml:Polygon`, and our LIDO output contains none of them. Recorded, not used.
+- **`lido`** — **envelope only; content is not validated.** The vendored schema
+  imports `xml.xsd` (2001-era URL) and GML 3.1.1 over plain http, so loading it
+  fetches the GML tree — and the type xmlschema chokes on lives in **GML, not in
+  LIDO** (`grep AbstractReferenceSystemBaseType data/lido/lido-v1.0.xsd` finds
+  nothing), so it says nothing about our payload. Repoint those two imports at
+  local copies — the current `xml.xsd`, plus a stub declaring only the three GML
+  elements LIDO references (`Point`, `LineString`, `Polygon`; no GML *type* is
+  derived from, so an element-only stub suffices) — and the schema loads and our
+  payload **validates**, with `xmlschema` and without lxml. Verified, not
+  enabled: see `todo/lido-validation.md`. LIDO 1.1 is no help — same two imports,
+  same failure.
 
 **Zetcom does have a schema** — `data/zetcom/module_1_6.xsd`, self-contained,
 `targetNamespace="http://www.zetcom.com/ria/ws/module"`, taken from

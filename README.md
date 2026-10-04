@@ -185,5 +185,5 @@ by **Tim Brody** that ships with HTTP::OAI
   and German, plus the naming grammar.
 - **`todo/`** — decisions taken but deliberately not built, and the open
   questions: the index proposal (gated on a benchmark), the nginx
-  reverse-proxy question, and deleted-record/tombstone handling (blocked on
-  what the colleague's setup does).
+  reverse-proxy question, deleted-record/tombstone handling (blocked on what the
+  colleague's setup does), and LIDO content validation (works; not switched on).
