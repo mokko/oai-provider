@@ -198,6 +198,10 @@ the `@source=ISIL/ID`-with-a-bare-number state zml2lido produces.
   present-but-unpublished is still correctly dropped (the predicate reads its `ObjPublicationGrp`),
   but a target that was simply never exported is indistinguishable from an unpublished one. If a
   second corpus is ever ingested, this needs the RIA fallback — the thing `mpapi` did.
-- **`ObjPublicationGrp` in the store.** This rule relies on the target's `ObjPublicationGrp` and
-  `ObjOwnerRef` being in the stored payload. Confirm on the real dump that both are present on
-  Object records (`__lastModified`/`__orgUnit` are, per the ingest notes; these two should be).
+- ~~**`ObjPublicationGrp` in the store.**~~ **Verified against the live `sync_Object` (1000
+  records):** every record carries `ObjPublicationGrp` (as a `repeatableGroup`) and `ObjOwnerRef`,
+  and all 1000 satisfy the publication predicate — the store *is* the published set, so "present in
+  the store" == "online". The records are stored whole, root `application`, record =
+  `application/modules/module[@name='Object']/moduleItem`, namespace-stripped; the file is split per
+  record but nothing inside the record is cut. `$input` in the recipe is the same shape: the
+  document `_xslt_payload` assembles as `<application><modules><module name="Object">…`.
