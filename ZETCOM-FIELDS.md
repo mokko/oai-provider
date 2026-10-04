@@ -8,7 +8,7 @@ the ones actually present in the imported data (`sync_Object` 1000, `sync_Person
 field naming is compositional, so most are unambiguous, but a few are guesses. Those are marked
 **`?`**. The authoritative labels live in the MuseumPlus field configuration (or with the
 registrars / the colleague); **correct anything here that reads wrong** — this file is a gloss, not a
-source of truth. Counts in the appendix are real.
+source of truth.
 
 ## 1. The naming grammar
 
@@ -270,38 +270,3 @@ that is not in the tables.
 | `MulPhotographerPerRef` | photographer (Person) | Fotograf:in (Person) |
 | `LinkingInfoTxt` / `LinkDisplayTxt` / `LinkStatusVoc` | linking info | Verknüpfungsinfo |
 | `MulNotesClb` / `NotesClb` | notes | Notizen |
-
-## 5. Appendix — every distinct name in the data
-
-Per module, by element kind, with the number of occurrences. Nothing here is glossed; it is the raw
-inventory, so you can check the tables above and fill in what is missing.
-
-### Object (1000 records)
-
-- **dataField (89):** SortLnu, ModifiedByTxt, ModifiedDateDat, ThumbnailBoo, MoveChildObjectsBoo, DetailTxt, DatestampToFuzzySearchLnu, DateFromTxt, DateToTxt, DatestampFromFuzzySearchLnu, DateTxt, TechnicalTermMultipleBoo, PageRefTxt, TitleTxt, CatalogueNumberTxt, NumberTxt, SystematicMultipleBoo, ExportClb, Part1Txt, ObjObjectNumberTxt, InventarNrSTxt, ObjTechnicalTermClb, WidthNum, HeightNum, _UserOalSortierungLLnu, _UserOalTextMClb, ObjObjectNumberSortedTxt, DateTsp, PicturePageTxt, ObjRecordCreatedByTxt, DateToTsp, NotesClb, Part2Txt, ObjInventoryDateDat, DetailsTxt, SpecialClb, PositionTxt, LabelClb, TextHTMLClb, TextClb, MemoClb, Part3Txt, ObjAcquisitionReferenceNrTxt, ExportBoo, NotationTxt, TimeFromTim, LogClb, TransliterationClb, MethodTxt, CommentClb, ObjIconographyContentBriefClb, Part4Txt, LoanNotesClb, _UserOalA04STxt, PreviewTxt, PreviewOther2Txt, PreviewOther1Txt, _UserOalA06STxt, _UserOalA05STxt, TextTxt, SourceTxt, DateDat, _UserOalA07STxt, NumberMaxTxt, SuffixTxt, AddressTxt, TechnicalTermTxt, PrefixTxt, NumberLnu, InvDescriptionClb, DisplayClb, OrientationTxt, MontageFramingClb, InscriberTxt, DiameterNum, NotesAClb, TranslationClb, Part5Txt, DepthNum, NotesBClb, EvidenceBClb, PartTxt, EvidenceAClb, ConditionClb, ThicknessNum, Sort001Lnu, ObjMigrationTxt, HandlingClb, DateFromDat
-- **virtualField (53):** PreviewVrt, TechniqueVrt, MaterialVrt, PreviewDateVrt, PreviewENVrt, DenominationSpecific3Vrt, DenominationSpecific3ENVrt, DenominationSpecific2Vrt, DenominationSpecific2ENVrt, DenominationSpecific1Vrt, DenominationSpecific1ENVrt, Delimiter2Vrt, Delimiter1Vrt, ObjUuidVrt, ObjPerAssociationVrt, ObjPerAssociationSurnameVrt, ObjPerAssociationSmallestVrt, ObjPerAssociationMainParticipantVrt, ObjPerAssociationMainParticipantNameVrt, ObjPerAssociationGenderVrt, ObjOrgUnitVrt, ObjObjectVrt, ObjObjectTitleVrt, ObjObjectReferenceNumbersVrt, ObjObjectNumberWithReplacedSpecialCharactersVrt, ObjObjectNumberVrt, ObjObjectNumberSortedVrt, ObjObjectNumberSortedMEKVrt, ObjObjectNumberSorted02MEKVrt, ObjObjectNumberPart3Vrt, ObjObjectNumberPart2Vrt, ObjObjectNumberPart1Vrt, ObjObjectIPTCVrt, ObjObjectENVrt, ObjObjectArchiveContentVrt, ObjNormalLocationVrt, ObjNormalLocationHierarchicalVrt, ObjMultimediaRestrictionsVrt, ObjMaterialTechniqueVrt, ObjGeograficVrt, ObjDateVrt, ObjDashboardPublicationStatusVrt, ObjCurrentLocationVrt, ObjCurrentLocationHierarchicalVrt, ObjCurrentLocationGrpVrt, ObjBarcodeNumberVrt, ObjAssociatedPlaceVrt, NumbersVrt, NumberWithoutSpecialCharactersVrt, NumberVrt, NumberSortedVrt, NumberSortedPart02MEKVrt, NumberSortedMEKVrt
-- **vocabularyReference (51):** TypeVoc, StatusVoc, DenominationVoc, PublicationVoc, RoleVoc, AttributionVoc, TechnicalTermVoc, MaterialVoc, SystematicVoc, UnitDdiVoc, ObjOrgGroupVoc, LocationVoc, ObjNormalLocationVoc, TechniqueVoc, _UserOalTextSTxt, ResposibleVoc, MethodVoc, TypeBVoc, TypeAVoc, PreselectTypeBVoc, PreselectTypeAVoc, ReasonVoc, LanguageVoc, ObjCurrentLocationVoc, ObjCategoryVoc, Type001Voc, DelimiterVoc, CategoryVoc, ObjPublicationStatusVoc, PlaceVoc, KeyWordVoc, ObjAcquisitionSourceVoc, GeopolVoc, ObjCreditLineVoc, AuthenticityVoc, PrefixVoc, LoanVoc, ObjConservationTermsLoanVoc, EditingVoc, ArchiveVoc, TemperatureVoc, HumidityVoc, CertaintyVoc, ObjProvBewertungVoc, ObjCompilationVoc, KeywordVoc, PeriodVoc, _UserOalTextMVoc, TermsVoc, SWDVoc, HolderVoc
-- **moduleReference (19):** TypeDimRef, ObjPerAssociationRef, ObjOwnerRef, ObjMultimediaRef, InvNumberSchemeRef, MovementRef, ObjObjectGroupsRef, ObjOwnership001Ref, ObjLiteratureRef, ObjOwnershipRef, ObjRegistrarRef, ObjAcquisitionSourcePerRef, ObjConservationRef, ObjObjectARef, ObjObjectBRef, ObjCollectionActivityRef, ExhibitionRef, AddressRef, ObjMovementRef
-- **repeatableGroup (37):** ObjSystematicGrp, ObjPublicationGrp, ObjObjectTitleGrp, ObjObjectNumberGrp, ObjTechnicalTermGrp, ObjMaterialTechniqueGrp, ObjDimAllGrp, ObjDateGrp, ObjCurrentLocationGrp, ObjResponsibleGrp, ObjOtherNumberGrp, ObjAcquisitionDateGrp, ObjOwnerMethodGrp, ObjTextGrp, ObjAcquisitionNotesGrp, ObjAcquisitionMethodGrp, ObjLabelObjectGrp, ObjGeograficGrp, ObjConservationTermsGrp, _UserObjGeneralMidasAspektGrp, _UserObjGeneralStandortGrp, ObjKeyWordsGrp, ObjCommentGrp, ObjTextOnlineGrp, ObjNumberObjectsGrp, _UserObjGeneralTexteObjekteGrp, ObjEditingGrp, ObjArchiveGrp, ObjURLGrp, ObjAccessionGrp, ObjEditorNotesGrp, ObjIlluminationGrp, ObjIconographyGrp, ObjConditionGrp, _UserObjGeneralSprachfassungGrp, ObjSWDGrp, ObjRightsGrp
-- **composite (2):** ObjObjectCre, ObjGeneralCre
-- **systemField (10):** `__id`, `__uuid`, `__orgUnit`, `__created`, `__createdUser`, `__lastModified`, `__lastModifiedUser`, `__legacyId`, `__fieldsFilled`, `__referencesFilled`
-
-### Person (652 records)
-
-- **dataField (40):** SortLnu, NotesClb, ModifiedByTxt, ModifiedDateDat, NameTxt, SortingLnu, DatestampFromFuzzySearchLnu, DateFromTxt, DatestampToFuzzySearchLnu, DatingNewTxt, DateToTxt, Content001Clb, PerNennformTxt, PerNameTxt, DateFromDat, KatNoTxt, DateToDat, GNDTxt, TextClb, ULANTxt, DateDat, AddressTxt, AklBiographieClb, AklVitaClb, AklWvzClb, AklAuthorTxt, AklBiogrammClb, PerSourceClb, SourceTxt, AklExhibitionClb, AddressClb, TextHTMLClb, AklSourceClb, PerNotesClb, PlaceTxt, VIAFTxt, ReligionTxt, GNDCorporateTxt, ThumbnailBoo, PageRefTxt
-- **virtualField (3):** PreviewVrt, PerUuidVrt, PerPersonVrt
-- **vocabularyReference (25):** RoleVoc, AttributionVoc, TypeVoc, PlaceNameVoc, TypeKindVoc, TypeCategoryVoc, DenominationVoc, PerTypeVoc, PerGenderVoc, GeograficVoc, TitleVoc, TypeAVoc, FunctionVoc, PerNationalityVoc, TypeBVoc, SourceTxt, CollectionVoc, PerClassVoc, GndVoc, LanguageVoc, PrefixVoc, UlanVoc, ViafVoc, CorporateGndVoc, StatusVoc
-- **moduleReference (11):** PerObjectRef, PerObjectgroupRef, PerLiteratureRef, PerOwnershipMNRef, PerVenderRef, PerPersonBRef, PerPersonARef, PerPhotographerRef, AddressRef, PerMultimediaRef, HolderRef
-- **repeatableGroup (13):** PerStandardDataGrp, PerDateGrp, PerGeograficGrp, PerOccupationGrp, PerGeneralGrp, PerNameOtherGrp, PerTitleGrp, PerBiographicalNoteGrp, PerURLGrp, PerResponsibilityGrp, PerTextCollectionGrp, PerAddressGrp, PerRightsGrp
-- **composite (1):** PerPersonCre
-- **systemField (10):** as Object
-
-### Multimedia (4232 records)
-
-- **dataField (42):** ContentTxt, TagTxt, SortLnu, ThumbnailBoo, ContentLnu, ExportBoo, MulTemplateBoo, MulOriginalFileTxt, MulSizeTxt, MulSizeLnu, MulOriginalFileLocationClb, MulSubjectTxt, MulDateTxt, MulUseTxt, MulReferenceNumberTxt, MulShootingDateDat, NotesClb, ModifiedDateDat, ModifiedByTxt, ContentDateTst, MulDateExifTst, StandardImageBoo, MulSizeMBNum, LinkingInfoTxt, LinkDisplayTxt, MulIPTCObjRefTxt, MulIPTCLastUpdateMetadataTxt, MulIPTCUrheberTxt, MulIPTCStatusTxt, MulIPTCLastExportTxt, MulIPTCRightsTxt, ContentDat, MulIPTCObjTitleTxt, MulTypeTxt, MulSHA1Txt, MulPhotocreditTxt, MulIPTCLastUpdateTxt, MulSourceTxt, BeginDateDat, ProcessedBoo, MulNotesClb, EndDateDat
-- **virtualField (2):** ContentVrt, MulMultimediaVrt
-- **vocabularyReference (18):** TagVoc, TypeVoc, MulTypeVoc, MulCategoryVoc, MulColorVoc, ApprovalVoc, LicenceVoc, TypeCategoryVoc, MulShootingReasonVoc, MulStatusVoc, MulBorrowStatusVoc, MulMatTechVoc, LinkStatusVoc, MulFormatVoc, CategoryVoc, MulDigitilizationProcessVoc, HolderVoc, MulViewVoc
-- **moduleReference (3):** MulObjectRef, MulPhotographerPerRef, MulMultimediaGroup001Ref
-- **repeatableGroup (5):** MulApprovalGrp, MulRightsGrp, MulTypeGrp, MulEXIFGrp, MulIPTCGrp
-- **composite (1):** MulReferencesCre
-- **systemField (10):** as Object
