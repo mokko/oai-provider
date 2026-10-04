@@ -37,7 +37,7 @@ def test_modules_come_from_the_config(config: Config) -> None:
         "sync_Multimedia",
     ]
     assert [m.identifier_prefix for m in config.modules] == [
-        "spk-berlin.de:EM-object-",
+        "spk-berlin.de:object-",
         "spk-berlin.de:EM-person-",
         "spk-berlin.de:EM-asset-",
     ]

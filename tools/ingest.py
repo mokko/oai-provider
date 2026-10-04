@@ -165,7 +165,7 @@ async def run(args: argparse.Namespace) -> int:
 
 
 async def run_modules(args: argparse.Namespace, config, builder) -> int:
-    """Ingest every configured module into its own database.
+    """Ingest every module into its own database.
 
     This is the layout that emulates the colleague's setup: one database per
     module (`sync_Object`, `sync_Person`, `sync_Multimedia`), namespaces
@@ -175,11 +175,17 @@ async def run_modules(args: argparse.Namespace, config, builder) -> int:
 
     so his own queries read against our databases unchanged.
 
-    Each module is a **full-dump resync**: the database is dropped and rebuilt,
-    because the source records no deletes and re-running must not leave a
-    vanished record behind. Per-module databases also mean one module's absence
-    from a chunk can never touch another's records - the failure a single
-    reconciled database has.
+    **Additive by default.** Each record is `db:put` at `<Module>-<id>.xml`, so
+    the id is the key: a new id is added, an existing id is replaced, and a
+    record this dump does not mention is left alone. That makes importing
+    several chunks of one export safe - which is the point, because the source
+    records no deletes.
+
+    `--reset` instead drops and rebuilds each module's database from this dump,
+    which is what leaves a vanished record behind on the next run; it prints
+    what it drops first. A module **absent** from the dump is skipped (its
+    database untouched), so a per-module or partial dump merges cleanly; a
+    module present but empty is still refused.
     """
     dump = Path(args.dump).resolve()
     path = str(dump)
@@ -206,8 +212,9 @@ async def run_modules(args: argparse.Namespace, config, builder) -> int:
                 builder.module_count_query(), path=path, moduleName=module.name
             )
             if report is None:
-                print(f"{module.name}: not present in this dump", file=sys.stderr)
+                print(f"{module.name}: no report from the dump", file=sys.stderr)
                 return 4
+            present = report.get("present") == "true"
             items = int(report.get("items", "0"))
             with_id = int(report.get("withId", "0"))
             declared = report.get("declared", "")
@@ -216,6 +223,14 @@ async def run_modules(args: argparse.Namespace, config, builder) -> int:
                 f"(server declared {declared or '?'}), {with_id} with an id "
                 f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
             )
+            # A module this dump does not carry is not an error: leave its
+            # database alone and carry on with the modules that are here.
+            if not present:
+                print(
+                    f"  {module.name} is not in this dump - skipped, "
+                    f"'{module.database}' untouched"
+                )
+                continue
             if args.dry_run:
                 continue
             if items == 0:
@@ -226,8 +241,14 @@ async def run_modules(args: argparse.Namespace, config, builder) -> int:
                 )
                 return 5
 
-            if await bx.database_exists(module.database) and not args.keep:
-                await bx.drop_database(module.database)
+            if args.reset:
+                if await bx.database_exists(module.database):
+                    n = await bx.count_documents(module.database)
+                    print(
+                        f"  --reset: dropping '{module.database}' "
+                        f"({n} document(s)) and rebuilding from this dump"
+                    )
+                    await bx.drop_database(module.database)
             if not await bx.database_exists(module.database):
                 await bx.create_database(module.database)
 
@@ -260,10 +281,17 @@ def main() -> int:
     parser.add_argument("--dump-id", default=None, help="override the dump identity")
     parser.add_argument("--no-reconcile", action="store_true")
     parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="module mode: DROP each module database and rebuild it from this "
+        "dump (destructive, and it prints what it drops). The default is "
+        "additive: records are written in place, so a record this dump does "
+        "not contain is left alone.",
+    )
+    parser.add_argument(
         "--keep",
         action="store_true",
-        help="module mode: overwrite records in place instead of dropping the "
-        "database first (leaves records the new dump no longer contains)",
+        help="deprecated: additive is now the default, so this does nothing",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--limit", type=int, default=20)

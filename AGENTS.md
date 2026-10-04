@@ -86,16 +86,21 @@ collection('sync_Object')/application/modules/module[@name='Object']/moduleItem
 
 ```
 python tools/ingest.py sdata/Dump.xml --dry-run     # per-module counts only
-python tools/ingest.py sdata/Dump.xml               # drop and rebuild each db
-python tools/ingest.py sdata/Dump.xml --keep        # overwrite in place
+python tools/ingest.py sdata/Dump.xml               # additive: add new, update seen
+python tools/ingest.py sdata/Dump.xml --reset       # DROP and rebuild each db
 ```
 
 - **Databases are `sync_<Name>`** — `sync_Object`, `sync_Person`,
   `sync_Multimedia` — matching the layout this is meant to be installed into.
-- **Each module is a full-dump resync**: its database is dropped and rebuilt,
-  because the source records no deletes and an overwrite would leave a vanished
-  record behind. Per-module databases also mean one module missing from a chunk
-  can never tombstone another module's records.
+- **Ingest is additive by default; `--reset` is the destructive one.** Each
+  record is `db:put` at `<Module>-<id>.xml`, so the id is the key: a new id is
+  added, an existing id replaced, and a record the dump does not mention left
+  alone — so importing several chunks of one export just works. `--reset` drops
+  and rebuilds each database from that one file (and prints what it drops
+  first); running it per chunk would make the last chunk the only data, the
+  module-mode version of the enveloped path's per-chunk reconcile trap. A module
+  **absent** from a dump is skipped (its database untouched), so a per-module
+  file merges cleanly; a module present but *empty* is refused.
 - **Namespaces are stripped on the way in** (a recursive XQuery `local:strip()`
   rebuilds each element with `local-name()`). The original file is never
   touched; the stored copy is the one deliberate exception to "payload stored
@@ -113,8 +118,9 @@ python tools/ingest.py sdata/Dump.xml --keep        # overwrite in place
 - **The module tag distinguishes the records.** `@id` is unique only within a
   module — the ranges overlap (Object reaches 935894, Person 1764036,
   Multimedia 8533256, and one id appears as both an Object and a Multimedia
-  record) — so each module carries an identifier prefix: `EM-object-`,
-  `EM-person-`, `EM-asset-`.
+  record) — so each module carries an identifier prefix: `object-`,
+  `EM-person-`, `EM-asset-` (the Object prefix dropped the `EM-` on request;
+  the other two still carry it).
 - **Getting files out of the zips.** The samples arrive as zips whose single
   entry is **LZMA (method 14)**. Info-ZIP's `unzip` refuses ("need PK compat.
   v6.3"), and there is no 7z or bsdtar on this box. Python's `zipfile` handles

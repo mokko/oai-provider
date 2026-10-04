@@ -107,7 +107,7 @@ kind = "passthrough"
 [[modules]]
 name = "Object"
 database = "sync_Object"
-identifierPrefix = "spk-berlin.de:EM-object-"
+identifierPrefix = "spk-berlin.de:object-"
 
 [[modules.terms]]
 term = "dc:type"

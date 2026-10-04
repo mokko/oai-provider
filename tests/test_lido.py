@@ -202,7 +202,7 @@ def test_list_identifiers_as_lido_is_the_object_set(live: Config) -> None:
     headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
     assert headers, "no rows"
     ids = [h.find(q("identifier")).text for h in headers]
-    assert all(i.startswith("spk-berlin.de:EM-object-") for i in ids)
+    assert all(i.startswith("spk-berlin.de:object-") for i in ids)
     # and the raw store still spans all three modules
     ria = _call(live, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
     tok = ria.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
@@ -210,7 +210,7 @@ def test_list_identifiers_as_lido_is_the_object_set(live: Config) -> None:
 
 
 def test_get_record_as_lido(live: Config) -> None:
-    ident = "spk-berlin.de:EM-object-935894"
+    ident = "spk-berlin.de:object-935894"
     root = _call(
         live,
         ("verb", "GetRecord"),
@@ -245,7 +245,7 @@ def test_the_raw_payload_is_untouched_by_having_asked_for_lido(live: Config) -> 
     root = _call(
         live,
         ("verb", "GetRecord"),
-        ("identifier", "spk-berlin.de:EM-object-935894"),
+        ("identifier", "spk-berlin.de:object-935894"),
         ("metadataPrefix", "ria"),
     )
     md = root.find(f"{q('GetRecord')}/{q('metadata')}")

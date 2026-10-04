@@ -187,7 +187,7 @@ namespaces = { lido = "http://www.lido-schema.org" }
 [[modules]]
 name = "Object"
 database = "sync_Object"
-identifierPrefix = "spk-berlin.de:EM-object-"
+identifierPrefix = "spk-berlin.de:object-"
 
 # Sets for this module (module mode reads [[modules.sets]]; the [[mapping.sets]]
 # above applies only to the enveloped path). "KK" is our internal label for the
