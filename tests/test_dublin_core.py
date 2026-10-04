@@ -82,6 +82,8 @@ def test_a_term_needs_exactly_one_source() -> None:
         TermRule(term="dc:title")
     with pytest.raises(ConfigError, match="exactly one"):
         TermRule(term="dc:title", xpath="a", literal="b")
+    with pytest.raises(ConfigError, match="exactly one"):
+        TermRule(term="dc:title", xpath="a", expression="b")
 
 
 def test_a_term_must_be_a_prefixed_name() -> None:
@@ -353,6 +355,23 @@ def test_the_object_title_is_the_virtual_field(config: Config) -> None:
     ]
     assert titles, "the Object module maps no dc:title"
     assert titles[0].xpath == "//virtualField[@name='ObjObjectTitleVrt']/value"
+
+
+def test_the_object_dimensions_are_composed(config: Config) -> None:
+    """`dc:format` carries dimensions as well as material/technique — DCMI defines
+    it as "the file format, physical medium, or dimensions of the resource". The
+    value can't come from a path: height, width and the unit live in three
+    places, so it is an `expression`, and the unit is read from `UnitDdiVoc`
+    rather than assumed."""
+    fmt = next(f for f in config.formats if f.prefix == "oai_dc")
+    formats = [t for t in fmt.terms if t.term == "dc:format" and t.module == "Object"]
+    assert len(formats) == 2, formats
+    expressions = [t for t in formats if t.expression]
+    assert len(expressions) == 1, "dimensions should be the expression"
+    text = expressions[0].expression
+    assert "ObjDimAllGrp" in text
+    assert "HeightNum" in text and "WidthNum" in text
+    assert "UnitDdiVoc" in text, "the unit is data, not a constant"
 
 
 def test_the_person_date_is_the_primary_dated_entry(config: Config) -> None:

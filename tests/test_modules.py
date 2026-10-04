@@ -216,6 +216,24 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1001</value>
         </dataField>
+        <repeatableGroup name="ObjDimAllGrp" size="1">
+          <repeatableGroupItem id="7004">
+            <dataField dataType="Long" name="SortLnu">
+              <value>1</value>
+            </dataField>
+            <dataField dataType="Numeric" name="HeightNum">
+              <value>25.2</value>
+            </dataField>
+            <dataField dataType="Numeric" name="WidthNum">
+              <value>16.7</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <vocabularyReference name="UnitDdiVoc" id="60030" instanceName="UnitDdiVgr">
+          <vocabularyReferenceItem id="1610300" name="cm">
+            <formattedValue language="de">cm</formattedValue>
+          </vocabularyReferenceItem>
+        </vocabularyReference>
         <moduleReference name="ObjObjectGroupsRef">
           <moduleReferenceItem moduleItemId="6054"/>
         </moduleReference>
@@ -359,6 +377,22 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     z = "{http://www.zetcom.com/ria/ws/module}"
     name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
     assert name is not None and name.text == "Doe, Jane"
+
+
+def test_dimensions_are_served_with_their_unit(module_config: Config) -> None:
+    """Height, width and the unit are composed into one dc:format value. The unit
+    comes from UnitDdiVoc — it is data (cm or mm), not a declared constant — so
+    it has to appear in what is served."""
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:EM-object-1001"),
+        ("metadataPrefix", "oai_dc"),
+    )
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
+    assert md is not None, "no metadata served"
+    formats = [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "format"]
+    assert "25.2 x 16.7 cm" in formats, formats
 
 
 def test_a_person_gets_life_dates_but_not_a_residence(module_config: Config) -> None:

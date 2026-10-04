@@ -86,6 +86,24 @@
             </dataField>
           </repeatableGroupItem>
         </repeatableGroup>
+        <repeatableGroup name="ObjDimAllGrp" size="1">
+          <repeatableGroupItem id="7004">
+            <dataField dataType="Long" name="SortLnu">
+              <value>1</value>
+            </dataField>
+            <dataField dataType="Numeric" name="HeightNum">
+              <value>25.2</value>
+            </dataField>
+            <dataField dataType="Numeric" name="WidthNum">
+              <value>16.7</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <vocabularyReference name="UnitDdiVoc" id="60030" instanceName="UnitDdiVgr">
+          <vocabularyReferenceItem id="1610300" name="cm">
+            <formattedValue language="de">cm</formattedValue>
+          </vocabularyReferenceItem>
+        </vocabularyReference>
         <moduleReference name="ObjOwnerRef" targetModule="Address" multiplicity="N:1" size="1">
           <moduleReferenceItem moduleItemId="112264">
             <formattedValue language="de">Kupferstichkabinett, Staatliche Museen zu Berlin</formattedValue>

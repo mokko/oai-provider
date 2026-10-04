@@ -180,8 +180,13 @@ class TermRule:
     """One Dublin Core element and where its value comes from.
 
     `term` is a **prefixed** name that the format declares ("dc:type"). Exactly
-    one of `xpath` / `literal` is set: an XPath relative to the record, or a
-    constant written here (dc:language "de").
+    one of `xpath` / `literal` / `expression` is set.
+
+    `expression` is an XPath **expression** rather than a path, for a value that
+    no single path can produce because it must be composed from several fields —
+    `dc:format`'s dimensions, say, where the two numbers and their unit live in
+    three different places. It is taken as written, with `$record` standing for
+    the record element.
 
     `module` scopes the rule to one module's records. The three modules are
     three different record shapes, so a term rarely applies to all of them;
@@ -196,6 +201,7 @@ class TermRule:
     term: str
     xpath: str = ""
     literal: str = ""
+    expression: str = ""
     module: str = ""
 
     def __post_init__(self) -> None:
@@ -203,9 +209,11 @@ class TermRule:
             raise ConfigError(
                 f"term {self.term!r} must be a prefixed name like 'dc:title'"
             )
-        if bool(self.xpath) == bool(self.literal):
+        sources = (bool(self.xpath), bool(self.literal), bool(self.expression))
+        if sum(sources) != 1:
             raise ConfigError(
-                f"term {self.term!r} needs exactly one of xpath / literal"
+                f"term {self.term!r} needs exactly one of "
+                "xpath / literal / expression"
             )
 
 
@@ -229,6 +237,7 @@ def _term_from(t: dict, where: str, *, allow_module: bool) -> TermRule:
         term=t["term"],
         xpath=t.get("xpath", ""),
         literal=t.get("literal", ""),
+        expression=t.get("expression", ""),
         module=t.get("module", ""),
     )
 

@@ -309,14 +309,21 @@ class QueryBuilder:
             if rule.literal:
                 parts.append(f"<{rule.term}>{_xq_text(rule.literal)}</{rule.term}>")
                 continue
-            # relative to the record; a leading / means "search down from it"
-            path = (
-                f"{base}{rule.xpath}"
-                if rule.xpath.startswith("/")
-                else f"{base}/{rule.xpath}"
-            )
+            if rule.expression:
+                # An expression, not a path: it may have to compose several
+                # fields, which no path can do. `$record` marks the record, so
+                # the expression stays independent of the variable name the
+                # template happens to use ($src in the payload phase).
+                source = rule.expression.replace("$record", base)
+            else:
+                # relative to the record; a leading / means "search down from it"
+                source = (
+                    f"{base}{rule.xpath}"
+                    if rule.xpath.startswith("/")
+                    else f"{base}/{rule.xpath}"
+                )
             parts.append(
-                f"for $v in ({path})[normalize-space(string(.)) ne '']\n"
+                f"for $v in ({source})[normalize-space(string(.)) ne '']\n"
                 f"        return <{rule.term}>{{string($v)}}</{rule.term}>"
             )
         return ",\n        ".join(parts)

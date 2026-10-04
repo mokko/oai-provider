@@ -151,6 +151,33 @@ module = "Object"
 term = "dc:format"
 xpath = "//virtualField[@name='ObjMaterialTechniqueVrt']/value"
 
+# Dimensions. Dublin Core has no measurement element; `dc:format` is where DCMI
+# puts them ("The file format, physical medium, or **dimensions** of the
+# resource"), and `dcterms:extent` — "the size or duration of the resource" — is
+# unavailable, because oai_dc permits only the fifteen simple elements.
+#
+# This one is an **expression**, not a path, because the value is composed from
+# three places at once and no path can do that: the primary `ObjDimAllGrp` entry
+# (SortLnu = 1, falling back to the first — 714 of the 1000 objects have exactly
+# one) and the object's `UnitDdiVoc`. The unit is **real data** (885 cm, 9 mm),
+# not a declared constant, so a millimetre object is not labelled centimetres.
+#
+# Height and width only. DepthNum (4 objects), DiameterNum (7) and ThicknessNum
+# (1) are too thin to carry, and an entry with only one of the two numbers is
+# skipped rather than served half-way. 878 of the 1000 objects get a value; the
+# rest get none, rather than a bare number with no unit.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:format"
+expression = """
+let $items := $record//repeatableGroup[@name='ObjDimAllGrp']/repeatableGroupItem
+let $m := ($items[dataField[@name='SortLnu']/value = '1'], $items)[1]
+let $h := ($m/dataField[@name='HeightNum']/value[normalize-space(.)])[1]
+let $w := ($m/dataField[@name='WidthNum']/value[normalize-space(.)])[1]
+let $u := ($record//vocabularyReference[@name='UnitDdiVoc']//formattedValue[normalize-space(.)])[1]
+return if ($h and $w) then concat($h, ' x ', $w, if ($u) then concat(' ', $u) else '') else ()
+"""
+
 # subject keywords, from the classification the museum files the object under
 [[metadata.formats.terms]]
 module = "Object"
