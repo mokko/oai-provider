@@ -18,11 +18,31 @@ corrupt the request.
 
 from __future__ import annotations
 
+import re
+
 import httpx
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
 
 REST_NS = "http://basex.org/rest"
+
+# A database name we are willing to interpolate into a BaseX command or an
+# XQuery literal. BaseX database names are identifiers; a name carrying a space,
+# quote or newline could end the command early, so it is refused rather than
+# escaped.
+_DB_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*$")
+
+
+def _xq_string(value: str) -> str:
+    """A single-quoted XQuery string literal (quote doubled)."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _db_name(name: str) -> str:
+    """A database name safe to interpolate into a command or query."""
+    if not _DB_NAME_RE.fullmatch(name):
+        raise ValueError(f"not a valid BaseX database name: {name!r}")
+    return name
 
 
 class BaseXError(Exception):
@@ -142,16 +162,18 @@ class BaseXClient:
             return False
 
     async def create_database(self, name: str) -> None:
-        await self.command(f"CREATE DB {name}")
+        await self.command(f"CREATE DB {_db_name(name)}")
 
     async def database_exists(self, name: str) -> bool:
-        text = await self.query(f"db:exists({name!r})")
+        text = await self.query(f"db:exists({_xq_string(_db_name(name))})")
         return text.strip() == "true"
 
     async def drop_database(self, name: str) -> None:
-        await self.command(f"DROP DB {name}")
+        await self.command(f"DROP DB {_db_name(name)}")
 
     async def count_documents(self, database: str) -> int:
         """How many documents a database holds."""
-        text = await self.query(f"count(collection({database!r}))")
+        text = await self.query(
+            f"count(collection({_xq_string(_db_name(database))}))"
+        )
         return int(text.strip() or 0)
