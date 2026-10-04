@@ -98,6 +98,15 @@ python tools/ingest.py sdata/Dump.xml --keep        # overwrite in place
   touched; the stored copy is the one deliberate exception to "payload stored
   verbatim". Stripping conflates the four RIA dialects, which is harmless while
   every record is a module response.
+- **The RIA namespace is restored only for a transform that needs it.** The
+  store stays namespace-free; when a `kind = "xslt"` format is served,
+  `oai/mapping.py`'s `local:zetcom()` rebuilds each element with
+  `QName(ZETCOM_NS, local-name(.))` — the mirror of `local:strip()` — and
+  `_xslt_payload()` assembles `<application xmlns="…zetcom…"><modules>…` from the
+  record plus its related Person/Multimedia/object records, each re-namespaced,
+  before handing the whole thing to `xslt:transform`. `ria` and `oai_dc` never
+  see a namespace. Attributes pass through untouched: module ingest only ever
+  dropped *element* namespaces.
 - **The module tag distinguishes the records.** `@id` is unique only within a
   module — the ranges overlap (Object reaches 935894, Person 1764036,
   Multimedia 8533256, and one id appears as both an Object and a Multimedia
