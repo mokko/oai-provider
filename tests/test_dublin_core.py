@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import re
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -427,3 +428,157 @@ def test_every_record_on_a_real_page_serves_a_title(live: Config) -> None:
             if c.tag.split("}")[-1] == "title"
         ]
         assert titles and all(titles), "a record was served without a dc:title"
+
+
+# -- dc:creator: the role allow-list ---------------------------------------
+
+
+def _shipped_creator() -> TermRule:
+    """dc:creator as `oai.toml` ships it, not a copy that could drift from it.
+
+    Terms live on the metadata *format*, carrying the module they apply to.
+    """
+    config = Config.load(ROOT / "oai.toml")
+    return next(
+        t
+        for f in config.formats
+        for t in f.terms
+        if t.term == "dc:creator" and t.module == "Object"
+    )
+
+
+def _only_creator_module(cfg: Config, term: TermRule) -> Config:
+    """The live config, with one module over the sample and one dc term."""
+    formats = tuple(
+        dataclasses.replace(f, terms=(term,)) if f.prefix == "oai_dc" else f
+        for f in cfg.formats
+    )
+    return dataclasses.replace(
+        cfg,
+        formats=formats,
+        modules=(
+            ModuleConfig(
+                name="Object",
+                database=TEST_DB,
+                identifier_prefix="x:obj-",
+            ),
+        ),
+    )
+
+
+def _seed_object_module(cfg: Config, dump: Path) -> int:
+    """Ingest one dump into the test database; returns how many records landed."""
+    builder = QueryBuilder(cfg.modules, cfg.timezone_offset)
+
+    async def go():
+        async with _client(cfg) as bx:
+            if await bx.database_exists(TEST_DB):
+                await bx.drop_database(TEST_DB)
+            await bx.create_database(TEST_DB)
+            await bx.query(
+                builder.module_ingest_query(),
+                path=str(dump),
+                db=TEST_DB,
+                moduleName="Object",
+            )
+            return int(
+                await bx.query(
+                    f"count(db:get('{TEST_DB}')/application/modules/module/moduleItem)"
+                )
+            )
+
+    return asyncio.run(go())
+
+
+def _creators(cfg: Config, identifiers: list[str]) -> dict[str, list[str]]:
+    served = {}
+    for ident in identifiers:
+        root = _call(
+            cfg,
+            ("verb", "GetRecord"),
+            ("identifier", ident),
+            ("metadataPrefix", "oai_dc"),
+        )
+        served[ident] = [v for term, v in _dc_of(root) if term == "creator"]
+    return served
+
+def test_the_shipped_dc_creator_reads_the_role_not_the_display_order(
+    live: Config,
+) -> None:
+    """dc:creator is chosen by RoleVoc, and the name is parsed out of the
+    association's display string."""
+    shipped = _shipped_creator()
+    assert shipped.expression and not shipped.xpath
+
+    cfg = _only_creator_module(live, _shipped_creator())
+    ids = _sample_ids()
+    assert _seed_object_module(cfg, SAMPLE) == len(ids)
+    served = _creators(cfg, [f"x:obj-{i}" for i in ids])
+
+    # Each fixture record names exactly one maker, a Zeichner*in; the value is
+    # the display string with the attribution prefix and the life dates gone -
+    # and, for the third, with the name's own qualifier intact.
+    assert [served[f"x:obj-{i}"] for i in ids] == [
+        ["Maarten van Havelaar"],
+        ["Maarten van Havelaar"],
+        ["David Tielens (der Jüngere)"],
+    ]
+    for values in served.values():
+        for value in values:
+            assert not re.search(r"\(\d", value), f"life dates left in {value!r}"
+            assert "Zeichner" not in value, f"role left in {value!r}"
+
+
+# a sitter, a maker, and an engraver - the engraver's role is real but not yet
+# in the shipped list, so it is the case that says the list is closed
+SITTER_MAKER_ENGRAVER = """<application xmlns="http://www.zetcom.com/ria/ws/module">
+  <modules>
+    <module name="Object">
+      <moduleItem hasAttachments="false" id="900001">
+        <systemField dataType="Timestamp" name="__lastModified">
+          <value>2026-01-01 00:00:00.000</value>
+        </systemField>
+        <moduleReference name="ObjPerAssociationRef" multiplicity="N">
+          <moduleReferenceItem moduleItemId="501">
+            <formattedValue language="de">Ausführung: Der Porträtierte, Dargestellt</formattedValue>
+            <vocabularyReference name="RoleVoc" id="30423" instanceName="ObjPerAssociationRoleVgr">
+              <vocabularyReferenceItem id="1" name="Dargestellt">
+                <formattedValue language="de">Dargestellt</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </moduleReferenceItem>
+          <moduleReferenceItem moduleItemId="502">
+            <formattedValue language="de">Ausführung: Die Zeichnerin (1700 - 1760), Zeichner*in</formattedValue>
+            <vocabularyReference name="RoleVoc" id="30423" instanceName="ObjPerAssociationRoleVgr">
+              <vocabularyReferenceItem id="2" name="Zeichner*in">
+                <formattedValue language="de">Zeichner*in</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </moduleReferenceItem>
+          <moduleReferenceItem moduleItemId="503">
+            <formattedValue language="de">Ausführung: Der Stecher (1650 - 1700), Stecher*in</formattedValue>
+            <vocabularyReference name="RoleVoc" id="30423" instanceName="ObjPerAssociationRoleVgr">
+              <vocabularyReferenceItem id="3" name="Stecher*in">
+                <formattedValue language="de">Stecher*in</formattedValue>
+              </vocabularyReferenceItem>
+            </vocabularyReference>
+          </moduleReferenceItem>
+        </moduleReference>
+      </moduleItem>
+    </module>
+  </modules>
+</application>
+"""
+
+
+def test_a_depicted_person_is_not_a_creator(live: Config, tmp_path) -> None:
+    """The record that made this mapping necessary: its person associations are
+    a depicted sitter, an engraver, and a maker - only the maker is a creator."""
+    dump = tmp_path / "occupations.xml"
+    dump.write_text(SITTER_MAKER_ENGRAVER, encoding="utf-8")
+
+    cfg = _only_creator_module(live, _shipped_creator())
+    assert _seed_object_module(cfg, dump) == 1
+    served = _creators(cfg, ["x:obj-900001"])
+
+    assert served["x:obj-900001"] == ["Die Zeichnerin"]

@@ -127,11 +127,47 @@ module = "Object"
 term = "dc:publisher"
 xpath = "//moduleReference[@name='ObjOwnerRef']//formattedValue"
 
-# the main person association, as the museum's own display form ("Opel, Peter")
+# The maker(s) - chosen by ROLE, not by "main participant".
+#
+# The virtual field previously used here is whoever the museum lists first, and
+# the person associations carry two vocabularies that say what that person did:
+# `RoleVoc` (Zeichner*in, Stecher*in, Maler*in, Dargestellt, Verleger*in, …) and
+# `AttributionVoc` (Ausführung, zugeschrieben, Umkreis, …). The main participant
+# is the person who actually executed the work in 830 of the 850 objects that
+# have an execution attribution - and **150 objects have none at all**, where the
+# associations are a depicted sitter (136 objects), somebody merely mentioned
+# (107), a paper maker (37) or a publisher. dc:creator was serving those.
+#
+# So the role list below is the allow-list; add a role to widen it. It is a
+# deliberate subset for now: Stecher*in (186 objects, engravers), Buchmaler*in
+# (62), Holzschneider*in (27) and the rest are not in it yet.
+# Coverage as configured: Zeichner*in 671 objects, Maler*in 39, Künstler*in 0
+# (that role occurs nowhere in this export - inert in a list, which is fine).
+#
+# The name has to come out of the association's own display string - there is no
+# separate name field on it. Two shapes occur: "Ausführung: Jean Antoine Watteau
+# (1684-1721), Zeichner*in" and "Friedrich Bury (1763 - 1823), Maler*in" (no
+# attribution). So: drop an optional "<attribution>: " prefix, take what precedes
+# ", ", then drop a *trailing* parenthesised group **only if it holds a digit**
+# (a date). Not the first " (": a name carries its own qualifier -
+# "David Tielens (der Jüngere) (1610 - 1690)" must survive as
+# "David Tielens (der Jüngere)". 866 entries parse, none empty.
 [[metadata.formats.terms]]
 module = "Object"
 term = "dc:creator"
-xpath = "//virtualField[@name='ObjPerAssociationMainParticipantNameVrt']/value"
+expression = """
+distinct-values(
+  for $a in $record//moduleReference[@name='ObjPerAssociationRef']/moduleReferenceItem[
+        vocabularyReference[@name='RoleVoc']//formattedValue =
+          ('Zeichner*in', 'Maler*in', 'Künstler*in')]
+  let $text := string($a/formattedValue)
+  let $afterAttribution :=
+        if (contains($text, ': ')) then substring-after($text, ': ') else $text
+  let $beforeRole := substring-before($afterAttribution, ', ')
+  let $name := replace($beforeRole, '\\s*\\([^()]*\\d[^()]*\\)$', '')
+  where normalize-space($name) ne ''
+  return normalize-space($name))
+"""
 
 # the object's own term, e.g. "Zeichnung"
 [[metadata.formats.terms]]
