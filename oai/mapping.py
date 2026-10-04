@@ -255,6 +255,10 @@ class QueryBuilder:
         # element, so a payload rooted at it is not the record and does not
         # resolve in Zetcom's schema. Serve the whole document.
         #
+        # This is the module path, which is RIA-shaped by construction (see
+        # MetadataFormat's note): the module element below is MuseumPlus's, not
+        # something the generic passthrough mechanism introduces.
+        #
         # `totalSize` is the number of records THIS document holds - the store
         # keeps one record per document, so 1, not the source file's count. It
         # is the single site: ingest does not copy it. Always written, so a

@@ -249,6 +249,14 @@ class MetadataFormat:
     kind="passthrough" serves the stored payload verbatim inside <metadata>.
     kind="derived" builds `wrapper` from the term rules (oai_dc), so the
     payload is stored once and any number of views are assembled from it.
+
+    Note where the shapes live: module mode's store is RIA-shaped by
+    construction (`application/modules/module[@name=…]/moduleItem`, one record
+    per document), so a passthrough payload in module mode is that RIA-shaped
+    document, and the serve path restates a module's own record count in
+    `@totalSize` because the store's copy describes the source dump. That is
+    RIA-specific on purpose - it belongs to the module store, not to the
+    passthrough mechanism, which is otherwise source-agnostic.
     """
 
     prefix: str
