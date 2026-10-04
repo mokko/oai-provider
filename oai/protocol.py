@@ -28,6 +28,7 @@ from .mapping import QueryBuilder
 OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 OAI_DC_NS = "http://www.openarchives.org/OAI/2.0/oai_dc/"
+DC_NS = "http://purl.org/dc/elements/1.1/"
 TOKEN_VERSION = 1
 
 # A namespace prefix is arbitrary - the *URI* is what the spec fixes - so the
@@ -532,7 +533,16 @@ class Provider:
         _el(node, "deletedRecord").text = ident.deleted_record
         _el(node, "granularity").text = ident.granularity
         if ident.description:
-            _el(node, "description").text = ident.description
+            # descriptionType is `<any namespace="##other">`: bare text is not
+            # admissible, so the note is wrapped in a small oai_dc record -
+            # schema-backed, and a namespace harvesters already understand.
+            # _el() qualifies every name with the OAI namespace, so foreign
+            # elements are built directly.
+            desc = _el(node, "description")
+            dc = ET.SubElement(desc, f"{{{OAI_DC_NS}}}dc")
+            ET.SubElement(
+                dc, f"{{{DC_NS}}}description"
+            ).text = ident.description
         return node
 
     async def list_metadata_formats(self, request: Request) -> ET.Element:

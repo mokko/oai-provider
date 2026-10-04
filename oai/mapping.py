@@ -160,7 +160,14 @@ class QueryBuilder:
         if fmt is not None and fmt.kind == "xslt":
             return self._xslt_payload(module, fmt)
         terms = self.terms_for(module, fmt)
-        body = self._metadata_branch(fmt, terms, "$src", "$src")
+        # A passthrough format serves the stored record, and module ingest
+        # stripped that record of namespaces. OAI-PMH's <metadata> is declared
+        # `<any namespace="##other" processContents="strict"/>`, and `##other`
+        # excludes the *absent* namespace - so a namespace-free payload is not
+        # admissible at all, however well-formed. Re-namespace it for the wire,
+        # exactly as the XSLT path does. The **store** stays stripped: this is a
+        # serve-time rebuild, not an ingest change.
+        body = self._metadata_branch(fmt, terms, "local:zetcom($src)", "$src")
         prefix = _xq_string(module.identifier_prefix)
         return (
             f"for $src in collection({_xq_string(module.database)})"

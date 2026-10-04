@@ -181,9 +181,10 @@ def test_get_record_returns_header_and_payload(cfg: Config) -> None:
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     assert md is not None
     payload = list(md)[0]
-    # module mode stores records namespace-stripped, so the verbatim payload has
-    # no Zetcom namespace here (the LIDO transform re-adds it via local:zetcom)
-    assert payload.tag == "moduleItem"
+    # the store is namespace-stripped; the wire is not. A namespace-free payload
+    # is not admissible under <metadata>'s namespace="##other" wildcard, so the
+    # RIA namespace is rebuilt at serve time (local:zetcom), as for the XSLT path.
+    assert payload.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
     assert payload.get("id") == "1001"
 
 

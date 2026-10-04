@@ -13,13 +13,13 @@ hermes-agent and deepseek-v4.1 flash.
   (`oai.toml`).
 - **One document per record in BaseX**, under the wrapper the module layout
   expects; the source element is kept whole inside it.
-- **Namespaces are stripped on the way in, restored on demand.** Module mode
-  stores every record with its namespaces removed (`local:strip`), which is
+- **Namespaces are stripped on the way in, restored on the way out.** Module
+  mode stores every record with its namespaces removed (`local:strip`), which is
   what matches the colleague's `sync_*` layout and conflates the RIA dialects.
-  A format that needs them back — the LIDO `xslt` transform is written against
-  RIA-qualified names — has each element rebuilt under Zetcom's namespace at
-  serve time (`local:zetcom`), so the store stays namespace-free and nothing is
-  duplicated.
+  Every format that serves the record has each element rebuilt under Zetcom's
+  namespace at serve time (`local:zetcom`) — the LIDO transform is written
+  against RIA-qualified names, and OAI-PMH does not admit an unnamespaced
+  payload at all. So the store stays namespace-free and nothing is duplicated.
 - **The extraction runs inside BaseX** (real XPath 3.1), not in Python — no
   lxml, and no `xml.etree` XPath-1.0 subset either.
 - **Async Python** (Starlette + httpx). The query work happens in Java, off

@@ -331,8 +331,10 @@ def test_get_record_reads_the_module_payload_and_shifts_the_datestamp(
     assert header.find(q("datestamp")).text == "2026-03-02T08:00:00Z"
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
     item = list(md)[0]
-    assert item.tag == "moduleItem"
-    assert item.find("dataField[@name='PerNameTxt']/value").text == "Doe, Jane"
+    assert item.tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
+    z = "{http://www.zetcom.com/ria/ws/module}"
+    name = item.find(f"{z}dataField[@name='PerNameTxt']/{z}value")
+    assert name is not None and name.text == "Doe, Jane"
 
 
 def test_module_set_filters_on_the_envelope_free_rows(module_config: Config) -> None:
@@ -369,5 +371,8 @@ def test_list_records_carries_the_module_item_as_metadata(module_config: Config)
     root = _call(module_config, ("verb", "ListRecords"), ("metadataPrefix", "ria"))
     mds = root.findall(f"{q('ListRecords')}/{q('record')}/{q('metadata')}")
     assert len(mds) == 3
-    assert all(list(md)[0].tag == "moduleItem" for md in mds)
+    assert all(
+        list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
+        for md in mds
+    )
 

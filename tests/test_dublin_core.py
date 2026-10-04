@@ -244,7 +244,7 @@ def dc_config(live: Config) -> Config:
         database=TEST_DB,
         identifier_prefix="x:obj-",
         terms=(
-            TermRule(term="dc:title", xpath="//dataField[@name='ObjObjectTitleClb']/value"),
+            TermRule(term="dc:title", xpath="//virtualField[@name='ObjObjectTitleVrt']/value"),
             TermRule(
                 term="dc:identifier",
                 xpath="//dataField[@name='ObjObjectNumberTxt']/value",
@@ -252,7 +252,7 @@ def dc_config(live: Config) -> Config:
             # present in the sample's record 1001, absent from 1003
             TermRule(
                 term="dc:type",
-                xpath="//dataField[@name='ObjObjectNumberSortedTxt']/value",
+                xpath="//dataField[@name='ObjTechnicalTermClb']/value",
             ),
             TermRule(term="dc:date", xpath="//dataField[@name='NotInThisData']/value"),
             TermRule(term="dc:language", literal="de"),
@@ -337,7 +337,9 @@ def test_the_shipped_mapping_serves_dublin_core_from_the_real_modules(
         ("metadataPrefix", "ria"),
     )
     md = ria.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
-    assert list(md)[0].tag == "moduleItem"
+    # stored stripped, served namespaced: the wire payload must be admissible
+    # under <metadata>'s namespace="##other" wildcard
+    assert list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
 
 
 def test_the_object_title_is_the_virtual_field(config: Config) -> None:

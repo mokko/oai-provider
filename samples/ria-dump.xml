@@ -1,14 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A small synthetic MuseumPlus RIA dump, for the tests and for trying the ingest.
+
+  **It is shaped like the real export, not like a convenient fixture.** It
+  carries the fields the shipped mapping actually reads: ObjObjectTitleVrt,
+  ObjObjectNumberTxt, ObjTechnicalTermClb, ObjMaterialTechniqueVrt, ObjDateVrt,
+  ObjPerAssociationMainParticipantNameVrt, ObjOwnerRef, the ObjOrgGroupVoc /
+  MaterialVoc / ObjCategoryVoc references, and the ObjObjectTitleGrp title list
+  (SortLnu + TitleTxt).
+
+  An earlier version of this file carried `ObjObjectTitleClb` — which the real
+  export *never* has — and lacked `ObjObjectTitleVrt`, which every real object
+  does have. Fixture-based tests therefore could not see a title, and dc:title
+  was left out of the mapping for the Object module as a result. **Keep this
+  file representative**: the values below are invented, the shape is not.
+
+  Also like the real dump:
+    * `moduleItem` carries only `hasAttachments` and `id` — no `uuid` (uuid is
+      broken in the instance we mirror, so @id is the key);
+    * `virtualField` has a bare `<value>`, no dataType and no formattedValue;
+    * every object has a title, an owner reference and a `__lastModified`.
+
+  The three `__lastModified` values are load-bearing: a test rewrites two of
+  them to give all three records the same datestamp, to exercise the keyset
+  cursor against a non-unique key.
+-->
 <application xmlns="http://www.zetcom.com/ria/ws/module">
   <modules>
     <module name="Object" totalSize="3">
-      <moduleItem hasAttachments="true" id="1001" uuid="u-1001">
+
+      <!-- rich record: every mapped field present -->
+      <moduleItem hasAttachments="true" id="1001">
         <systemField dataType="Long" name="__id">
           <value>1001</value>
         </systemField>
         <systemField dataType="Timestamp" name="__lastModified">
           <value>2026-09-19 08:15:00.0</value>
-          <formattedValue language="de">19/09/2026 08:15</formattedValue>
+          <formattedValue language="de">19.09.2026 08:15</formattedValue>
         </systemField>
         <systemField dataType="Varchar" name="__orgUnit">
           <value>EM-Süd- und Südostasien</value>
@@ -16,25 +44,70 @@
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1001</value>
         </dataField>
-        <dataField dataType="Varchar" name="ObjDateTxt">
-          <value>um 1900</value>
+        <dataField dataType="Clob" name="ObjTechnicalTermClb">
+          <value>Trommel</value>
+          <formattedValue language="de">Trommel</formattedValue>
         </dataField>
-        <dataField dataType="Clob" name="ObjObjectTitleClb">
+        <virtualField name="ObjObjectTitleVrt">
           <value>Trommel aus Ghana</value>
-        </dataField>
+        </virtualField>
+        <virtualField name="ObjDateVrt">
+          <value>um 1900</value>
+        </virtualField>
+        <virtualField name="ObjMaterialTechniqueVrt">
+          <value>Holz und Tierhaut, bespannt</value>
+        </virtualField>
+        <virtualField name="ObjPerAssociationMainParticipantNameVrt">
+          <value>Unbekannt</value>
+        </virtualField>
+        <vocabularyReference name="ObjOrgGroupVoc" id="61643" instanceName="ObjOrgGroupVgr">
+          <vocabularyReferenceItem id="1632860" name="Musikinstrumente">
+            <formattedValue language="de">Musikinstrumente</formattedValue>
+          </vocabularyReferenceItem>
+        </vocabularyReference>
+        <vocabularyReference name="MaterialVoc" id="60012" instanceName="MaterialVgr">
+          <vocabularyReferenceItem id="1610001" name="Holz">
+            <formattedValue language="de">Holz</formattedValue>
+          </vocabularyReferenceItem>
+        </vocabularyReference>
+        <vocabularyReference name="ObjCategoryVoc" id="60020" instanceName="ObjCategoryVgr">
+          <vocabularyReferenceItem id="1610200" name="Hauptobjekt">
+            <formattedValue language="de">Hauptobjekt</formattedValue>
+          </vocabularyReferenceItem>
+        </vocabularyReference>
+        <repeatableGroup name="ObjObjectTitleGrp" size="1">
+          <repeatableGroupItem id="7001">
+            <dataField dataType="Long" name="SortLnu">
+              <value>1</value>
+              <formattedValue language="de">1</formattedValue>
+            </dataField>
+            <dataField dataType="Varchar" name="TitleTxt">
+              <value>Trommel aus Ghana</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <moduleReference name="ObjOwnerRef" targetModule="Address" multiplicity="N:1" size="1">
+          <moduleReferenceItem moduleItemId="112264">
+            <formattedValue language="de">Kupferstichkabinett, Staatliche Museen zu Berlin</formattedValue>
+          </moduleReferenceItem>
+        </moduleReference>
         <repeatableGroup name="ObjObjectGroupsRef" size="1">
-          <repeatableGroupItem id="7001" uuid="u-7001">
+          <repeatableGroupItem id="7002">
             <dataField dataType="Varchar" name="ObjObjectGroupsNameTxt">
               <value>Musikinstrumente</value>
             </dataField>
           </repeatableGroupItem>
         </repeatableGroup>
         <moduleReference name="ObjObjectGroupsRef">
-          <moduleReferenceItem moduleItemId="6054" uuid="u-6054"/>
+          <moduleReferenceItem moduleItemId="6054"/>
         </moduleReference>
       </moduleItem>
 
-      <moduleItem hasAttachments="false" id="1002" uuid="u-1002">
+      <!-- fewer fields: no technical term, no material/technique, no subjects -->
+      <moduleItem hasAttachments="false" id="1002">
+        <systemField dataType="Long" name="__id">
+          <value>1002</value>
+        </systemField>
         <systemField dataType="Timestamp" name="__lastModified">
           <value>2026-08-01 09:00:00.0</value>
         </systemField>
@@ -44,19 +117,56 @@
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1002</value>
         </dataField>
+        <virtualField name="ObjObjectTitleVrt">
+          <value>Walzenaufnahme, gesungen</value>
+        </virtualField>
+        <virtualField name="ObjDateVrt">
+          <value>1904</value>
+        </virtualField>
+        <repeatableGroup name="ObjObjectTitleGrp" size="1">
+          <repeatableGroupItem id="7003">
+            <dataField dataType="Long" name="SortLnu">
+              <value>1</value>
+            </dataField>
+            <dataField dataType="Varchar" name="TitleTxt">
+              <value>Walzenaufnahme, gesungen</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <moduleReference name="ObjOwnerRef" targetModule="Address" multiplicity="N:1" size="1">
+          <moduleReferenceItem moduleItemId="112264">
+            <formattedValue language="de">Kupferstichkabinett, Staatliche Museen zu Berlin</formattedValue>
+          </moduleReferenceItem>
+        </moduleReference>
         <moduleReference name="ObjObjectGroupsRef">
-          <moduleReferenceItem moduleItemId="78" uuid="u-78"/>
+          <moduleReferenceItem moduleItemId="78"/>
         </moduleReference>
       </moduleItem>
 
-      <moduleItem hasAttachments="false" id="1003" uuid="u-1003">
+      <!-- sparsest record: still titled and still owned, as the real export is -->
+      <moduleItem hasAttachments="false" id="1003">
+        <systemField dataType="Long" name="__id">
+          <value>1003</value>
+        </systemField>
         <systemField dataType="Timestamp" name="__lastModified">
           <value>2026-07-02 12:30:45.5</value>
+        </systemField>
+        <systemField dataType="Varchar" name="__orgUnit">
+          <value>EM-Süd- und Südostasien</value>
         </systemField>
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1003</value>
         </dataField>
+        <virtualField name="ObjObjectTitleVrt">
+          <value>Ohne Titel</value>
+        </virtualField>
+        <moduleReference name="ObjOwnerRef" targetModule="Address" multiplicity="N:1" size="1">
+          <moduleReferenceItem moduleItemId="112264">
+            <formattedValue language="de">Kupferstichkabinett, Staatliche Museen zu Berlin</formattedValue>
+          </moduleReferenceItem>
+        </moduleReference>
       </moduleItem>
+
     </module>
   </modules>
 </application>

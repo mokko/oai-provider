@@ -94,15 +94,23 @@ python tools/ingest.py sdata/Dump.xml --reset       # DROP and rebuild each db
   touched; the stored copy is the one deliberate exception to "payload stored
   verbatim". Stripping conflates the four RIA dialects, which is harmless while
   every record is a module response.
-- **The RIA namespace is restored only for a transform that needs it.** The
-  store stays namespace-free; when a `kind = "xslt"` format is served,
-  `oai/mapping.py`'s `local:zetcom()` rebuilds each element with
-  `QName(ZETCOM_NS, local-name(.))` — the mirror of `local:strip()` — and
-  `_xslt_payload()` assembles `<application xmlns="…zetcom…"><modules>…` from the
-  record plus its related Person/Multimedia/object records, each re-namespaced,
-  before handing the whole thing to `xslt:transform`. `ria` and `oai_dc` never
-  see a namespace. Attributes pass through untouched: module ingest only ever
-  dropped *element* namespaces.
+- **The RIA namespace is restored on the way out, whatever the format.** The
+  store stays namespace-free, and `oai/mapping.py`'s `local:zetcom()` rebuilds
+  each element with `QName(ZETCOM_NS, local-name(.))` — the mirror of
+  `local:strip()`. For a `kind = "xslt"` format `_xslt_payload()` assembles
+  `<application xmlns="…zetcom…"><modules>…` from the record plus its related
+  Person/Multimedia/object records, each re-namespaced, before handing the whole
+  thing to `xslt:transform`. For `ria` (`kind = "passthrough"`) the payload is
+  re-namespaced the same way, because **OAI-PMH does not admit an unnamespaced
+  payload at all**: `metadataType` is `<any namespace="##other">`, and `##other`
+  excludes the *absent* namespace. Attributes pass through untouched: module
+  ingest only ever dropped *element* namespaces.
+- **Cost of that rebuild, measured**: the `ria` payload phase goes from ~0.20 s
+  to ~0.47 s per 100 records, and a 100-record page grows ~10% (3.88 → 4.28 MB)
+  because BaseX serialises the rebuilt elements with an `ns2:` prefix on every
+  element once they sit beside OAI-namespaced ones. It is the price of serving a
+  conformant payload from a stripped store — the same trade already made for
+  LIDO — not an optimisation to revisit. gzip absorbs the bytes.
 - **The module tag distinguishes the records.** `@id` is unique only within a
   module — the ranges overlap (Object reaches 935894, Person 1764036,
   Multimedia 8533256, and one id appears as both an Object and a Multimedia
@@ -437,6 +445,15 @@ the export date, which changes on every export.
   rule. Keep scalar keys above the first array-of-tables header.
 
 ## Testing conventions
+
+- **The fixture must stay representative.** `samples/ria-dump.xml` is shaped like
+  the real export — it carries the fields the mapping actually reads
+  (`ObjObjectTitleVrt`, `ObjObjectTitleGrp`, `ObjOwnerRef`, the vocabularies) and
+  no fields the export lacks. Fixture and reality disagreeing *in both
+  directions* is exactly how `dc:title` came to be missing for objects: the old
+  fixture had `ObjObjectTitleClb`, which reality never has, and lacked the title
+  field reality always has. **Count coverage against the module databases, never
+  against the fixture**, and re-shape the fixture when a real field is found.
 
 - **Assert against BaseX directly**, not against your own summary: run a query
   and print what is stored. When a path matches 0 nodes, check `local-name()`

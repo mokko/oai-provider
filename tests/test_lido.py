@@ -249,4 +249,5 @@ def test_the_raw_payload_is_untouched_by_having_asked_for_lido(live: Config) -> 
         ("metadataPrefix", "ria"),
     )
     md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
-    assert list(md)[0].tag == "moduleItem"
+    # stored stripped, served namespaced
+    assert list(md)[0].tag == "{http://www.zetcom.com/ria/ws/module}moduleItem"
