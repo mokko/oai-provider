@@ -244,6 +244,24 @@ module = "Object"
 term = "dc:subject"
 xpath = "//repeatableGroup[@name='ObjSystematicGrp']/repeatableGroupItem/vocabularyReference[@name='SystematicVoc']//formattedValue"
 
+# The object's descriptive text ("Beschreibung"). It lives in the field
+# `TextClb`, which occurs inside two groups, and the distinction matters:
+#   * `ObjTextOnlineGrp` is the museum's *online-approved* description - the
+#     same group `zml2lido` maps to `lido:descriptiveNoteValue`, and the
+#     stylesheet says outright that the other text blocks ("other
+#     beschreibungstexte") are **not approved for online use**. 88 of the 1000
+#     objects carry a non-empty `TextClb` here (101 values: 13 objects have
+#     more than one entry).
+#   * `ObjTextGrp` is the general text-block field ("Textfelder") - 298 of the
+#     1000 objects - and is deliberately **not** the source, because publishing
+#     it would put unapproved text on the wire.
+# `TextHTMLClb` carries the same text with HTML markup; the plain `TextClb` is
+# what a DC description wants. A term with no value emits nothing.
+[[metadata.formats.terms]]
+module = "Object"
+term = "dc:description"
+xpath = "//repeatableGroup[@name='ObjTextOnlineGrp']//dataField[@name='TextClb']/value"
+
 # Where. Dublin Core's `dc:coverage` is the spatial element ("the spatial or
 # temporal topic of the resource … or the jurisdiction under which the resource
 # is relevant"); qualified DC would say `dcterms:spatial`, which oai_dc does not

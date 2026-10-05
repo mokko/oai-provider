@@ -283,6 +283,23 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
             </vocabularyReference>
           </repeatableGroupItem>
         </repeatableGroup>
+        <repeatableGroup name="ObjTextGrp" size="1">
+          <repeatableGroupItem id="7006">
+            <dataField dataType="Clob" name="TextClb">
+              <value>Unapproved working note, must not be served</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
+        <repeatableGroup name="ObjTextOnlineGrp" size="1">
+          <repeatableGroupItem id="7007">
+            <dataField dataType="Clob" name="TextClb">
+              <value>Online description for 1001</value>
+            </dataField>
+            <dataField dataType="Clob" name="TextHTMLClb">
+              <value>&lt;div&gt;HTML variant, not the description&lt;/div&gt;</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
         <moduleReference name="ObjObjectGroupsRef">
           <moduleReferenceItem moduleItemId="6054"/>
         </moduleReference>
@@ -294,6 +311,13 @@ TWO_MODULES = """<?xml version="1.0" encoding="UTF-8"?>
         <dataField dataType="Varchar" name="ObjObjectNumberTxt">
           <value>EM-1002</value>
         </dataField>
+        <repeatableGroup name="ObjTextGrp" size="1">
+          <repeatableGroupItem id="7008">
+            <dataField dataType="Clob" name="TextClb">
+              <value>ObjTextGrp-only text, not approved for online</value>
+            </dataField>
+          </repeatableGroupItem>
+        </repeatableGroup>
       </moduleItem>
     </module>
     <module name="Person" totalSize="1">
@@ -484,6 +508,38 @@ def test_the_systematic_classification_is_a_subject(module_config: Config) -> No
     assert md is not None, "no metadata served"
     subjects = [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "subject"]
     assert "Zeichnung" in subjects, subjects
+
+
+def _descriptions(root) -> list[str]:
+    md = root.find(f"{q('GetRecord')}/{q('record')}/{q('metadata')}")
+    assert md is not None, "no metadata served"
+    return [c.text for c in list(md)[0] if c.tag.split("}")[-1] == "description"]
+
+
+def test_description_comes_from_the_online_group(module_config: Config) -> None:
+    """dc:description is the *online-approved* object text — TextClb inside
+    ObjTextOnlineGrp — never the sibling TextHTMLClb (same text, HTML) nor the
+    unapproved ObjTextGrp note the fixture also carries."""
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:object-1001"),
+        ("metadataPrefix", "oai_dc"),
+    )
+    assert _descriptions(root) == ["Online description for 1001"]
+
+
+def test_unapproved_object_text_is_not_a_description(module_config: Config) -> None:
+    """Text that lives only in ObjTextGrp is not approved for online use, so it
+    must not surface as dc:description. A record with no online text emits no
+    dc:description rather than an empty one."""
+    root = _call(
+        module_config,
+        ("verb", "GetRecord"),
+        ("identifier", "spk-berlin.de:object-1002"),
+        ("metadataPrefix", "oai_dc"),
+    )
+    assert _descriptions(root) == []
 
 
 def test_dimensions_are_served_with_their_unit(module_config: Config) -> None:
