@@ -94,3 +94,45 @@ the curve.
 Does `sync_Object` / `sync_Person` / `sync_Multimedia` in his setup carry
 attribute or value indexes? If yes, match them — that is both the faster path
 and the one our XPaths are meant to read identically against.
+
+## Measured, 2026-10-05: the page dies before it is slow
+
+Ingesting the real export gave the store **115,313 documents** (27 of the 47
+chunks; Object 27,000 · Person 3,356 · Multimedia 84,957). With that in the
+store, `tests/test_schema_conformance.py::test_the_response_validates_against_oai_pmh[ListRecords/lido]`
+fails — not on the schema, but with **`HTTP 500: Interrupted.` after ~31 s**.
+
+That is BaseX's **global `TIMEOUT` option, `30` in `~/basex/basex/.basex`**: it
+stops a REST query at 30.0 s. Established by ruling the alternatives out:
+
+- a `?timeout=120` REST parameter changed nothing — `500 Interrupted.` at 30.0 s;
+- `SET TIMEOUT …` is refused ("Unknown option 'TIMEOUT'") and `db:option('TIMEOUT')`
+  answers "Unknown option" too — it is a **global** option, read from the options
+  file, so it takes a `.basex` edit and a restart;
+- Jetty's own `idleTimeout` in `webapp/WEB-INF/jetty.xml` is 60 s, so it is not the
+  one that fires;
+- it is not memory: `usedmemory` was 24 MB, and the BaseX log line is
+  `500 Interrupted. 30010.02 ms`.
+
+**So the trigger this file was waiting for has arrived, and it arrived as a hard
+wall rather than a bend.** A LIDO page over the real store cannot be answered at
+all on this machine until either the limit is raised (which makes each page take
+30 s+, at 300k records minutes) or Step 0/1 below is done. Raising `TIMEOUT`
+buys a working-but-slow provider; it does not make the per-page cost any smaller,
+and it is now measurable on real data rather than estimated.
+
+## Measured, same day: what the ingest spends its time on
+
+One 135 MB chunk, into empty databases, before the one-pass count query landed:
+
+| phase | time |
+|---|---|
+| count pass, once per module (three parses of the file) | 6.1 s each |
+| write pass: Object 1000 records | 14.1 s |
+| write pass: Person **44** records | 12.7 s |
+| write pass: Multimedia 3975 records | 9.2 s |
+
+The 44-record module cost what the 1000-record one did: the time is `parse-xml`
+reading the whole file, not the `db:put` calls. That is why the count pass is now
+one query for every module (57 s → 44 s on that chunk) and why the per-record
+skip idea is filed in `todo/skip-unchanged-records.md` rather than built.
