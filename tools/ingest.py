@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingest one big multi-record XML dump into BaseX for the OAI provider.
+"""Ingest MuseumPlus XML dumps - or the zips they arrive in - into BaseX.
 
 One database per MuseumPlus module (`sync_Object`, `sync_Person`,
 `sync_Multimedia`), the module's records stored namespace-stripped, one
@@ -17,6 +17,23 @@ chunks of one export safe - which matters, because the source records no
 deletes. `--reset` instead drops a module's database and rebuilds it from this
 dump, printing what it drops first.
 
+**Several dumps are accepted, and a directory.** An export arrives as dozens of
+chunk files: naming the directory ingests every one of them in **chunk order**,
+and the batch **stops at the first dump it cannot read**, rather than finishing
+a run whose data is quietly missing a chapter.
+
+**A `.zip` is unpacked here, because BaseX cannot do it.** BaseX reads zips
+perfectly well - its `archive:` module lists a deflated archive and parses the
+entry out of it - but these chunks are **LZMA** compressed (`method 14`), and
+the JDK zip reader BaseX uses handles stored and deflated only:
+
+    [archive:error] invalid CEN header (bad compression method: 14)
+
+`zipfile` and `lzma` are both in the standard library, so the archive is
+unpacked to a temporary file beside it and **deleted again** when that dump is
+done: the archive is the artefact that is kept, the unpacked XML is only the
+means.
+
 BaseX will not let one query both store and report, so a read-only count pass
 runs before each write pass. A module **absent** from the dump is skipped (its
 database untouched), so a per-module or partial dump merges cleanly; a module
@@ -27,8 +44,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import lzma
+import re
+import shutil
 import sys
+import tempfile
 import time
+import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -37,13 +61,205 @@ from oai.basex import BaseXClient, BaseXError  # noqa: E402
 from oai.config import Config, ConfigError  # noqa: E402
 from oai.mapping import QueryBuilder  # noqa: E402
 
+## What a dump may be. Anything else in a named directory is left alone.
+SUFFIXES = (".xml", ".zip")
+
+
+class DumpError(Exception):
+    """A dump that cannot be read. An error of its own because a batch stops on it."""
+
+
+def chunk_key(path: Path) -> list[object]:
+    """Sort key that orders `chunk2` before `chunk10`.
+
+    Sorting names as strings puts chunk10 between chunk1 and chunk2, which is
+    cosmetic in a listing and wrong in an ingest: these numbers are the order of
+    the export.
+    """
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", path.name)]
+
+
+def collect(sources: list[str]) -> list[Path]:
+    """Every dump to ingest, in the order they are to be ingested.
+
+    A **directory** contributes its `.xml` and `.zip` in chunk order. Where one
+    chunk is present twice - the archive as it arrived, and the `.xml` somebody
+    unpacked by hand before this CLI could - the **archive wins**: the archive is
+    what is kept, and the file beside it is a leftover of doing by hand what
+    `unpacked()` now does itself.
+    """
+    dumps: dict[str, Path] = {}
+    for source in sources:
+        named = Path(source)
+        if not named.is_dir():
+            # Named on the command line: taken as itself, whatever it is called.
+            dumps[named.stem] = named
+            continue
+        for child in sorted(named.iterdir(), key=chunk_key):
+            if child.suffix.lower() not in SUFFIXES:
+                continue
+            if child.name.startswith("."):
+                # Hidden files are never dumps: `unpacked()` writes its temporary
+                # copy with a leading dot precisely so a later scan of the same
+                # directory cannot mistake a leftover for a chunk.
+                continue
+            known = dumps.get(child.stem)
+            if known is None or child.suffix.lower() == ".zip":
+                dumps[child.stem] = child
+    return list(dumps.values())
+
+
+@contextlib.contextmanager
+def unpacked(dump: Path) -> Iterator[Path]:
+    """The file to hand BaseX for `dump`: itself, or a temporary unpacked copy.
+
+    See the module docstring for why the unpacking happens here and not in the
+    query. The temporary file is written **beside the archive, not in
+    `TMPDIR`**: `/tmp` is a tmpfs on the machine this is developed on, and one
+    chunk unpacks to up to ~0.5 GB, which is RAM there rather than disk.
+    """
+    if dump.suffix.lower() != ".zip":
+        yield dump
+        return
+
+    try:
+        with zipfile.ZipFile(dump) as archive:
+            members = [name for name in archive.namelist() if name.lower().endswith(".xml")]
+            if len(members) != 1:
+                raise DumpError(
+                    f"{dump.name}: expected one .xml inside the archive, found "
+                    f"{len(members)} ({', '.join(members) or 'none'})"
+                )
+            handle = tempfile.NamedTemporaryFile(
+                dir=dump.parent, prefix=f".{dump.name}.", suffix=".tmp.xml", delete=False
+            )
+            try:
+                with archive.open(members[0]) as packed, handle:
+                    shutil.copyfileobj(packed, handle, 1024 * 1024)
+            except BaseException:
+                # Nothing of a half-unpacked dump is left behind, whatever went
+                # wrong - including a Ctrl-C during a 0.5 GB chunk.
+                handle.close()
+                Path(handle.name).unlink(missing_ok=True)
+                raise
+    except (zipfile.BadZipFile, lzma.LZMAError, NotImplementedError) as exc:
+        raise DumpError(f"{dump.name}: cannot be unpacked ({exc})") from exc
+
+    temporary = Path(handle.name)
+    try:
+        yield temporary
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+async def ingest_one(
+    bx: BaseXClient,
+    config: Config,
+    builder: QueryBuilder,
+    path: str,
+    args: argparse.Namespace,
+    sizes: dict[str, int],
+) -> int:
+    """One dump: the count pass and then the write pass, module by module.
+
+    `sizes` collects each module database's document count as it is seen, so the
+    batch can say what the databases hold at the end. That is deliberately not a
+    running total: `count_documents` is the whole database every time, so adding
+    it up per dump would count the first chunk 48 times.
+    """
+    for module in config.modules:
+        t0 = time.monotonic()
+        report = await bx.query_xml(
+            builder.module_count_query(), path=path, moduleName=module.name
+        )
+        if report is None:
+            print(f"{module.name}: no report from the dump", file=sys.stderr)
+            return 4
+        present = report.get("present") == "true"
+        items = int(report.get("items", "0"))
+        with_id = int(report.get("withId", "0"))
+        undated = int(report.get("undated", "0"))
+        declared = report.get("declared", "")
+        print(
+            f"{module.name}: {items} record(s) "
+            f"(server declared {declared or '?'}), {with_id} with an id "
+            f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
+        )
+        if undated:
+            print(
+                f"  warning: {undated} {module.name} record(s) have no usable "
+                "__lastModified and will NOT be served - OAI requires a "
+                "datestamp, and the serve query drops what has none",
+                file=sys.stderr,
+            )
+        # A module this dump does not carry is not an error: leave its
+        # database alone and carry on with the modules that are here.
+        if not present:
+            print(
+                f"  {module.name} is not in this dump - skipped, "
+                f"'{module.database}' untouched"
+            )
+            continue
+        if args.dry_run:
+            continue
+        if items == 0:
+            print(
+                f"refusing to write an empty {module.name} module "
+                "(a bad module name would otherwise drop the whole database)",
+                file=sys.stderr,
+            )
+            return 5
+
+        if args.reset:
+            if await bx.database_exists(module.database):
+                n = await bx.count_documents(module.database)
+                print(
+                    f"  --reset: dropping '{module.database}' "
+                    f"({n} document(s)) and rebuilding from this dump"
+                )
+                await bx.drop_database(module.database)
+        if not await bx.database_exists(module.database):
+            await bx.create_database(module.database)
+
+        t1 = time.monotonic()
+        await bx.query(
+            builder.module_ingest_query(),
+            path=path,
+            db=module.database,
+            moduleName=module.name,
+        )
+        stored = await bx.count_documents(module.database)
+        sizes[module.database] = stored
+        print(
+            f"  ingest: {stored} document(s) in '{module.database}' "
+            f"({time.monotonic() - t1:.1f}s)"
+        )
+    return 0
+
 
 async def run(args: argparse.Namespace) -> int:
     config = Config.load(args.config)
     builder = QueryBuilder(config.modules, config.timezone_offset)
-    dump = Path(args.dump)
-    if not dump.exists():
-        print(f"dump not found: {dump}", file=sys.stderr)
+
+    dumps = collect(args.dumps)
+    if not dumps:
+        print("no dumps to ingest", file=sys.stderr)
+        return 2
+    for dump in dumps:
+        if not dump.exists():
+            print(f"dump not found: {dump}", file=sys.stderr)
+            return 2
+    # `--reset` rebuilds a database from ONE dump, so a batch would drop and
+    # rebuild once per chunk and end with only the last chunk's records - a
+    # database that looks perfectly fine. Refused rather than warned about,
+    # because the two flags are easy to combine by accident.
+    if args.reset and len(dumps) > 1:
+        print(
+            f"--reset rebuilds a module database from a single dump, so it is "
+            f"refused for the {len(dumps)} dumps given (it would leave the last "
+            "one as the only data). The default is additive; or name one dump.",
+            file=sys.stderr,
+        )
         return 2
     if not config.modules:
         print(
@@ -53,8 +269,7 @@ async def run(args: argparse.Namespace) -> int:
         )
         return 2
 
-    path = str(dump.resolve())
-    written = 0
+    sizes: dict[str, int] = {}
     async with BaseXClient(
         config.basex.url,
         config.basex.user,
@@ -71,84 +286,40 @@ async def run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
 
-        for module in config.modules:
-            t0 = time.monotonic()
-            report = await bx.query_xml(
-                builder.module_count_query(), path=path, moduleName=module.name
-            )
-            if report is None:
-                print(f"{module.name}: no report from the dump", file=sys.stderr)
-                return 4
-            present = report.get("present") == "true"
-            items = int(report.get("items", "0"))
-            with_id = int(report.get("withId", "0"))
-            undated = int(report.get("undated", "0"))
-            declared = report.get("declared", "")
-            print(
-                f"{module.name}: {items} record(s) "
-                f"(server declared {declared or '?'}), {with_id} with an id "
-                f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
-            )
-            if undated:
-                print(
-                    f"  warning: {undated} {module.name} record(s) have no usable "
-                    "__lastModified and will NOT be served - OAI requires a "
-                    "datestamp, and the serve query drops what has none",
-                    file=sys.stderr,
+        for number, dump in enumerate(dumps, start=1):
+            if len(dumps) > 1:
+                print(f"[{number}/{len(dumps)}] {dump.name}")
+            with unpacked(dump) as path:
+                code = await ingest_one(
+                    bx, config, builder, str(path.resolve()), args, sizes
                 )
-            # A module this dump does not carry is not an error: leave its
-            # database alone and carry on with the modules that are here.
-            if not present:
-                print(
-                    f"  {module.name} is not in this dump - skipped, "
-                    f"'{module.database}' untouched"
-                )
-                continue
-            if args.dry_run:
-                continue
-            if items == 0:
-                print(
-                    f"refusing to write an empty {module.name} module "
-                    "(a bad module name would otherwise drop the whole database)",
-                    file=sys.stderr,
-                )
-                return 5
-
-            if args.reset:
-                if await bx.database_exists(module.database):
-                    n = await bx.count_documents(module.database)
-                    print(
-                        f"  --reset: dropping '{module.database}' "
-                        f"({n} document(s)) and rebuilding from this dump"
-                    )
-                    await bx.drop_database(module.database)
-            if not await bx.database_exists(module.database):
-                await bx.create_database(module.database)
-
-            t1 = time.monotonic()
-            await bx.query(
-                builder.module_ingest_query(),
-                path=path,
-                db=module.database,
-                moduleName=module.name,
-            )
-            stored = await bx.count_documents(module.database)
-            written += stored
-            print(
-                f"  ingest: {stored} document(s) in '{module.database}' "
-                f"({time.monotonic() - t1:.1f}s)"
-            )
+            if code != 0:
+                # Stop at the first dump that failed: finishing the batch would
+                # write the rest and leave a store that is missing a chapter,
+                # with nothing on screen to say which one.
+                print(f"stopped at {dump.name}: nothing after it was read", file=sys.stderr)
+                return code
 
     if args.dry_run:
-        print("dry run: nothing written")
+        print(f"dry run: nothing written ({len(dumps)} dump(s) counted)")
+    elif sizes:
+        print(f"done: {len(dumps)} dump(s), additive. Stored now:")
+        for database, count in sizes.items():
+            print(f"  {database}: {count} document(s)")
     else:
-        print(f"done: {written} document(s) across {len(config.modules)} database(s)")
+        print(f"done: {len(dumps)} dump(s), nothing written")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("dump", help="the big multi-record XML file")
+    parser.add_argument(
+        "dumps",
+        nargs="+",
+        help="what to ingest: an .xml file, a .zip holding one, or a directory "
+        "of either. A directory is read in chunk order, and the batch stops at "
+        "the first dump that cannot be read.",
+    )
     parser.add_argument("-c", "--config", default="oai.toml")
     parser.add_argument("--dry-run", action="store_true", help="count only")
     parser.add_argument(
@@ -157,13 +328,14 @@ def main() -> int:
         help="DROP each module database and rebuild it from this dump "
         "(destructive, and it prints what it drops). The default is additive: "
         "records are written in place, so a record this dump does not contain "
-        "is left alone.",
+        "is left alone. Refused for more than one dump - it is a single-dump "
+        "operation.",
     )
     args = parser.parse_args()
 
     try:
         return asyncio.run(run(args))
-    except (ConfigError, BaseXError) as exc:
+    except (ConfigError, BaseXError, DumpError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

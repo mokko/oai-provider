@@ -55,6 +55,9 @@ uv pip install --python ./.venv/bin/python httpx starlette uvicorn python-multip
 # Ingest a MuseumPlus dump (module mode: one database per module)
 python tools/ingest.py sdata/Dump.xml --dry-run   # validate only
 python tools/ingest.py sdata/Dump.xml
+python tools/ingest.py sdata/                     # a directory: every chunk, in order
+python tools/ingest.py sdata/zips/*.zip           # the archives as they arrived: unpacked,
+                                                  # ingested, and the unpacked copy deleted
 
 # Serve
 cp .env.example .env      # set OAI_BASE_URL to where a harvester reaches you
