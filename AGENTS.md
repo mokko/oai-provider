@@ -31,6 +31,8 @@ that looked correct.
 ```
 python tools/ingest.py samples/ria-dump.xml            # additive
 python tools/ingest.py samples/ria-dump.xml --dry-run  # per-module counts only
+python tools/ingest.py sdata/                          # every chunk in the directory
+python tools/ingest.py sdata/zips/*.zip                # the archives as they arrived
 OAI_BASEX_PASSWORD=... python tools/ingest.py DUMP
 ```
 
@@ -39,6 +41,48 @@ query both store and report — a query is either updating or returning — so a
 read-only count pass runs before each write pass. A module the dump does not
 carry is skipped (its database untouched); a module present but *empty* is
 refused.
+
+### A batch, and a directory
+
+An export arrives as dozens of chunk files (`query1035073-chunk1…48`), so the CLI
+takes **several dumps or a directory** of them. A directory is read in **chunk
+order** — chunk2 before chunk10, which sorting the names as strings gets wrong —
+and the batch **stops at the first dump it cannot read**: carrying on would write
+the rest and leave a store quietly missing a chapter, with nothing on screen to
+say which one. Where a chunk is there both as an archive and as a hand-unpacked
+`.xml`, **the archive wins** (the `.xml` was a leftover of doing by hand what the
+CLI now does itself), and a hidden file is never a dump — the temporary copy
+below is written with a leading dot for exactly that reason.
+
+**`--reset` is refused for more than one dump.** It drops and rebuilds a module
+database from a single file, so run per chunk it would leave the last chunk as
+the only data — a database that looks perfectly fine. Refused rather than warned
+about, because the two flags are easy to combine by accident.
+
+### The zips: unpacked here, because BaseX cannot
+
+**BaseX reads zips quite happily** — `archive:entries` lists a deflated archive
+and `archive:extract-text` + `parse-xml` parses the entry out of it — but the
+chunks as delivered are **LZMA** compressed (zip `method 14`), and the JDK zip
+reader BaseX uses handles stored and deflated only:
+
+    [archive:error] invalid CEN header (bad compression method: 14)
+
+There is **no EXPath `zip:` module to install for it**: it was built into older
+BaseX releases and is gone in 12.4 (`XQST0059`), and installing one would not
+help anyway — what is missing is the decompressor, not the module. BaseX's own
+`archive:` module *is* the JDK's reader, and no compression library is on its
+classpath. `zipfile` and `lzma` are both in the standard library, so
+`tools/ingest.py` unpacks each archive itself:
+
+- **the archive is the artefact that is kept**; the unpacked XML is only the
+  means, and the temporary copy is **deleted** when that dump is done — and on a
+  failure, including a Ctrl-C, rather than left half-written;
+- the temporary file is written **beside the archive, not in `TMPDIR`**: `/tmp`
+  is a tmpfs on the machine this is developed on, and one chunk unpacks to up to
+  ~0.5 GB, which there is RAM rather than disk;
+- an archive must hold **exactly one `.xml`**: two record files are ambiguous,
+  and picking one silently would be a wrong ingest rather than a loud failure.
 
 ### Deletions
 
