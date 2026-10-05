@@ -19,8 +19,8 @@ that looked correct.
 - `oai/protocol.py` — the six verbs, error codes, datestamps, resumption
   tokens, `serialise`, and the `xslt_problem` startup probe.
 - `oai/app.py` — the Starlette app; `GET`/`POST /oai`, `GET /healthz`.
-- `xq/*.xq.tmpl` — the query templates: `module_ingest`, `module_count`,
-  `page`, `record`.
+- `xq/*.xq.tmpl` — the query templates: `module_ingest`, `module_counts` (every
+  module of one dump in a single pass), `page`, `record`.
 - `tools/ingest.py` — the CLI.
 - `tools/oai_browser.py` — an interactive OAI client (the six verbs from a
   menu) for testing a running provider; a stdlib reimplementation of HTTP::OAI's
@@ -38,9 +38,46 @@ OAI_BASEX_PASSWORD=... python tools/ingest.py DUMP
 
 One database per `[[modules]]` entry (see "Module mode"). BaseX will not let one
 query both store and report — a query is either updating or returning — so a
-read-only count pass runs before each write pass. A module the dump does not
+read-only count pass runs before each write pass, **once for every module rather
+than once per module**: `parse-xml` reads and parses the whole 135–500 MB file, so
+a per-module count paid that cost per module (6.1 s each on a 135 MB chunk, for a
+44-record module as much as for a 1000-record one). A module the dump does not
 carry is skipped (its database untouched); a module present but *empty* is
 refused.
+
+### A receipt: what is already in the store
+
+Each dump that goes in is recorded beside its own chunks, in
+`.ingest-receipt.json` — hidden, so the directory scan cannot take it for a chunk.
+One entry per dump: its **size and mtime**, when it was ingested, and how many
+documents each database held afterwards. A later run **skips a dump the receipt
+names with the same size and mtime**, which is what makes an interrupted import
+*resumable* instead of restartable — the measured chunk re-runs in 0.4 s instead of
+44. `--force` ignores it deliberately.
+
+The receipt is **a cache, not truth**, and it is built to fail in the safe
+direction:
+
+- **it names the databases it describes**, and is ignored when they are not this
+  run's. Without that, a run against another store (a probe, a second config, an
+  install rebuilt elsewhere) would leave a receipt that makes a real run skip a
+  chunk it has never ingested;
+- **if a database holds fewer documents than the receipt recalls**, something
+  dropped data behind its back: the receipt is ignored for the run, said out loud,
+  and the dumps are ingested again. A receipt that lies would skip chunks and leave
+  a hole the size of a chapter;
+- a receipt that cannot be read, or is not one, costs a **re-ingest**, never a
+  failed run;
+- it is written **after each dump**, atomically (beside itself, then moved into
+  place) — a half-written receipt reads as "this chunk was ingested" for a chunk
+  that was not;
+- **`--reset` starts it over**: it rebuilds each database from one dump, so every
+  other entry describes records that are no longer there.
+
+The receipt is about *files*. Skipping *records inside* a dump — comparing a
+record's `__lastModified` with the stored copy's — is a different thing, written up
+in `todo/skip-unchanged-records.md` rather than guessed at: the time is in parsing,
+not in the `db:put` calls, so it would buy less than it looks like.
 
 ### A batch, and a directory
 
