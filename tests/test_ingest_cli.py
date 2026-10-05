@@ -155,6 +155,74 @@ def test_a_file_that_is_not_an_archive_is_refused(tmp_path: Path) -> None:
             pass
 
 
+def test_a_receipt_round_trips_and_is_ignored_by_a_directory_scan(tmp_path: Path) -> None:
+    dumps = {"query1035073-chunk2.zip": {"size": 42, "modified": 1000}}
+    ingest.write_receipt(tmp_path, ["sync_Object", "sync_Person"], dumps)
+    assert ingest.read_receipt(tmp_path)["dumps"] == dumps
+    assert ingest.receipt_dumps(ingest.read_receipt(tmp_path), ["sync_Object", "sync_Person"]) == dumps
+    # Hidden, so the same directory can still be scanned for dumps.
+    assert ingest.collect([str(tmp_path)]) == []
+
+
+def test_a_receipt_written_for_other_databases_skips_nothing(tmp_path: Path) -> None:
+    """A probe's receipt must not make a real run skip a chunk it never ingested."""
+    ingest.write_receipt(tmp_path, ["probe_sync_Object"], {"chunk2.zip": {"size": 1}})
+    written = ingest.read_receipt(tmp_path)
+    assert ingest.receipt_dumps(written, ["sync_Object"]) == {}
+    assert ingest.receipt_dumps(written, ["probe_sync_Object"]) == {"chunk2.zip": {"size": 1}}
+
+
+def test_a_receipt_that_is_not_a_receipt_is_ignored(tmp_path: Path, capsys) -> None:
+    (tmp_path / ingest.RECEIPT).write_text('["just", "a", "list"]', encoding="utf-8")
+    assert ingest.read_receipt(tmp_path) == {}
+    assert "not a receipt" in capsys.readouterr().err
+
+
+def test_a_receipt_that_cannot_be_read_costs_a_reingest_not_a_failure(
+    tmp_path: Path, capsys
+) -> None:
+    (tmp_path / ingest.RECEIPT).write_text("{not json at all", encoding="utf-8")
+    assert ingest.read_receipt(tmp_path) == {}
+    assert "not readable" in capsys.readouterr().err
+
+
+def test_a_dump_is_skipped_only_when_it_is_the_same_file(tmp_path: Path) -> None:
+    dump = tmp_path / "query1035073-chunk2.zip"
+    _zip(dump, "query1035073-chunk2.xml", PAYLOAD)
+    stat = dump.stat()
+    record = {"size": stat.st_size, "modified": int(stat.st_mtime)}
+
+    assert ingest.already_ingested({dump.name: record}, dump) == record
+    # A chunk re-exported under the same name is a different file: same name is
+    # not the test, or the new records would never be read.
+    assert ingest.already_ingested({dump.name: {**record, "size": stat.st_size + 1}}, dump) is None
+    assert ingest.already_ingested({dump.name: {**record, "modified": 1}}, dump) is None
+    assert ingest.already_ingested({}, dump) is None
+    assert ingest.already_ingested({"other.zip": record}, dump) is None
+
+
+def test_a_receipt_that_records_more_than_the_store_holds_is_not_trusted() -> None:
+    receipt = {
+        "chunk1.zip": {"documents": {"sync_Object": 100, "sync_Multimedia": 400}},
+        "chunk2.zip": {"documents": {"sync_Object": 250}},
+    }
+    # The store grew past what the receipt recalls: still trustworthy - the
+    # receipt is a floor, not a ceiling.
+    ok, why = ingest.receipt_is_trustworthy(receipt, {"sync_Object": 300, "sync_Multimedia": 400})
+    assert ok and why == ""
+    # A database that now holds less than the receipt recalls means something
+    # dropped data: honouring it would skip chunks and leave a hole.
+    ok, why = ingest.receipt_is_trustworthy(receipt, {"sync_Object": 249, "sync_Multimedia": 400})
+    assert not ok and "sync_Object holds 249" in why
+    ok, why = ingest.receipt_is_trustworthy(receipt, {"sync_Object": 300, "sync_Multimedia": 0})
+    assert not ok and "sync_Multimedia holds 0" in why
+
+
+def test_a_receipt_with_nothing_recorded_is_trusted() -> None:
+    ok, why = ingest.receipt_is_trustworthy({}, {"sync_Object": 0})
+    assert ok and why == ""
+
+
 # -- the CLI, before it reaches BaseX ------------------------------------
 
 

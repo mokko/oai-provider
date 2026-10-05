@@ -602,9 +602,15 @@ class QueryBuilder:
         """Ingest one module into its own database (see the template)."""
         return self.render("module_ingest.xq.tmpl")
 
-    def module_count_query(self) -> str:
-        """Read-only record count for one module of a dump."""
-        return self.render("module_count.xq.tmpl")
+    def module_counts_query(self) -> str:
+        """Read-only record counts for **every** module of one dump.
+
+        One pass, not one pass per module: `parse-xml` reads and parses the
+        whole file, and a 135 MB chunk cost 6.1 s per module whether it held
+        1000 records or 44. The report is a `<modules>` element with one
+        `<module>` child per name, in the order given.
+        """
+        return self.render("module_counts.xq.tmpl")
 
     def fingerprint(self) -> str:
         """A digest of the mapping, so a resumption token issued under one

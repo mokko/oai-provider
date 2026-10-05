@@ -1,0 +1,49 @@
+(: Read-only: how many records does **each** module hold in this dump? One pass over the
+   dump answers for all of them.
+
+   The dump is 135-500 MB and `parse-xml` reads and parses every byte of it, so asking
+   once per module paid that cost once per module: on a 135 MB chunk the three counts
+   took 6.1 s each, and almost none of that was counting - the 44-record Person module
+   cost the same as the 1000-record Object one. The answer is one `<modules>` element
+   with a `<module>` child per name, **in the order the names were given**, and a module
+   the dump does not carry comes back `present="false"` rather than missing from the
+   report: absent would be indistinguishable from "the query did not answer".
+
+   `declared` is the module's own totalSize - the *server's* result size at export, not
+   this file's count - so it is reported beside `items` and never trusted as the number
+   of records. A mismatch is normal for a chunk.
+
+   `undated` is the count the serve query cannot datestamp: a missing or malformed
+   __lastModified. Those records are dropped from the repository silently (the serve
+   query filters on a datestamp), so the count pass reports them - an operator must be
+   able to see a record that will not be served.
+:)
+declare variable $path external;
+declare variable $moduleNames external;   (: comma-separated, in the order to report :)
+
+(: A record with a datestamp the serve query can read: a non-empty
+   __lastModified whose value parses. `castable as` is deliberate - the
+   obvious `try { xs:dateTime($v) instance of xs:dateTime } catch * {...}`
+   is answered from xs:dateTime's *static* return type, so the call never runs
+   and the catch never fires (BaseX returns true for 'not-a-date'). castable
+   evaluates the value and is false for a malformed one. :)
+declare function local:hasDate($item as node()?) as xs:boolean {
+  let $v := normalize-space($item/*:systemField[@name='__lastModified']/*:value[1])
+  return $v ne '' and replace($v, ' ', 'T') castable as xs:dateTime
+};
+
+let $doc := parse-xml(file:read-text($path))
+return
+  <modules>
+  {
+    for $name in tokenize($moduleNames, ',')
+    let $module := $doc/*:application/*:modules/*:module[@name = $name]
+    return
+      <module name="{$name}"
+              present="{exists($module)}"
+              declared="{string($module/@totalSize)}"
+              items="{count($module/*:moduleItem)}"
+              withId="{count($module/*:moduleItem[@id])}"
+              undated="{count($module/*:moduleItem[not(local:hasDate(.))])}"/>
+  }
+  </modules>

@@ -130,10 +130,17 @@ def test_module_ingest_writes_the_colleague_path(config: Config) -> None:
     assert "'totalSize'" in q and "ne 'totalSize'" in q
 
 
-def test_module_count_is_read_only(config: Config) -> None:
-    q = QueryBuilder(config.modules, config.timezone_offset).module_count_query()
+def test_module_counts_is_read_only(config: Config) -> None:
+    q = QueryBuilder(config.modules, config.timezone_offset).module_counts_query()
     assert "db:put" not in q
     assert "totalSize" in q
+    # every module of a dump in **one** pass: the file is parsed once and the
+    # names are read from one bound list, because parsing a 135 MB chunk three
+    # times cost 6.1 s each whether the module held 1000 records or 44.
+    assert "tokenize($moduleNames" in q
+    # a module the dump does not carry is reported, not omitted: an absent
+    # element cannot be told from a query that did not answer.
+    assert "present=" in q
     # it also reports how many records will get no datestamp, so a record the
     # serve query silently drops is visible. castable, not a try/instance-of:
     # the latter is answered from the static type and never evaluates.
@@ -225,13 +232,19 @@ def test_the_count_reports_records_without_a_usable_datestamp(live: Config, tmp_
 
     async def report(bx: BaseXClient):
         return await bx.query_xml(
-            builder.module_count_query(), path=str(dump), moduleName="Object"
+            builder.module_counts_query(), path=str(dump), moduleNames="Object,Person"
         )
 
     got = _run(live, report)
     assert got is not None
-    assert got.get("items") == "3"
-    assert got.get("undated") == "2"  # the malformed one and the missing one
+    children = {child.get("name"): child for child in got.findall("module")}
+    # Every name asked for is in the report, and the one this dump does not
+    # carry says so rather than going missing.
+    assert set(children) == {"Object", "Person"}
+    assert children["Person"].get("present") == "false"
+    assert children["Object"].get("present") == "true"
+    assert children["Object"].get("items") == "3"
+    assert children["Object"].get("undated") == "2"  # the malformed one and the missing one
 
 
 # -- the six verbs over the module databases ------------------------------

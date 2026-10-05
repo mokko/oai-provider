@@ -34,8 +34,21 @@ unpacked to a temporary file beside it and **deleted again** when that dump is
 done: the archive is the artefact that is kept, the unpacked XML is only the
 means.
 
-BaseX will not let one query both store and report, so a read-only count pass
-runs before each write pass. A module **absent** from the dump is skipped (its
+**A receipt says what is already in the store.** Each dump that goes in is
+recorded beside its own chunks, in `.ingest-receipt.json` (hidden, so a directory
+scan never takes it for a dump): the file's size and mtime, when it was ingested,
+and the databases' document counts afterwards. A later run **skips a dump the
+receipt names with the same size and mtime** — which is what makes an interrupted
+45-minute import resumable instead of restartable. The receipt is a cache and not
+truth: if a database holds fewer documents than the receipt records, it is ignored
+for that run and said out loud, because a receipt that lies would skip chunks and
+leave a hole the size of a chapter. `--force` ignores it on purpose.
+
+BaseX will not let one query both store and report, so a read-only count pass runs
+before the write pass — **once for all the modules, not once per module**:
+`parse-xml` reads and parses the whole 135-500 MB file, so a per-module count paid
+that cost per module (6.1 s each on a 135 MB chunk, for a 44-record module as much
+as for a 1000-record one). A module **absent** from the dump is skipped (its
 database untouched), so a per-module or partial dump merges cleanly; a module
 present but empty is still refused.
 """
@@ -45,6 +58,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import json
 import lzma
 import re
 import shutil
@@ -53,6 +67,7 @@ import tempfile
 import time
 import zipfile
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -63,6 +78,10 @@ from oai.mapping import QueryBuilder  # noqa: E402
 
 ## What a dump may be. Anything else in a named directory is left alone.
 SUFFIXES = (".xml", ".zip")
+
+## The receipt's file name. Hidden, so `collect()`'s scan of the same directory
+## never takes it for a chunk.
+RECEIPT = ".ingest-receipt.json"
 
 
 class DumpError(Exception):
@@ -152,6 +171,123 @@ def unpacked(dump: Path) -> Iterator[Path]:
         temporary.unlink(missing_ok=True)
 
 
+def read_receipt(directory: Path) -> dict:
+    """The receipt as written: `{"databases": [...], "dumps": {...}}`.
+
+    Empty when there is none, **and empty when it cannot be read**: the receipt
+    is a cache of what has been done, so a corrupt one must cost a re-ingest and
+    never a failed run.
+    """
+    path = directory / RECEIPT
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"warning: {path} is not readable ({exc}) - ignoring it", file=sys.stderr)
+        return {}
+    if not isinstance(data, dict) or not isinstance(data.get("dumps"), dict):
+        print(f"warning: {path} is not a receipt this understands - ignoring it", file=sys.stderr)
+        return {}
+    return data
+
+
+def receipt_dumps(receipt: dict, databases: list[str]) -> dict:
+    """The receipt's dump records, **if it was written for these databases**.
+
+    A receipt names the databases it describes. One written for another store — a
+    probe, a second config, an install rebuilt somewhere else — records counts for
+    databases this run knows nothing about, and its "already ingested" would be
+    about records that are not here. Empty means "nothing to skip", which is the
+    safe direction: the work is done again rather than skipped wrongly.
+    """
+    if sorted(str(name) for name in receipt.get("databases", [])) != sorted(databases):
+        return {}
+    return dict(receipt.get("dumps", {}))
+
+
+def write_receipt(directory: Path, databases: list[str], dumps: dict) -> None:
+    """Write the receipt **atomically**.
+
+    A half-written receipt is read back as "this chunk was ingested" for a chunk
+    that was not, and that is a hole in the store with nothing to show for it, so
+    the file is written beside itself and moved into place.
+    """
+    path = directory / RECEIPT
+    temporary = path.with_name(path.name + ".writing")
+    temporary.write_text(
+        json.dumps({"databases": sorted(databases), "dumps": dumps}, indent=2, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def already_ingested(receipt: dict, dump: Path) -> dict | None:
+    """The receipt's record for `dump`, **if it is the same file**.
+
+    Size and mtime are the test, not the name: a chunk delivered again has both,
+    while a file that was re-exported, replaced or truncated has not - and a name
+    alone would be a lie the moment a chunk is rebuilt under the same name.
+    """
+    record = receipt.get(dump.name)
+    if not isinstance(record, dict):
+        return None
+    stat = dump.stat()
+    if record.get("size") != stat.st_size or record.get("modified") != int(stat.st_mtime):
+        return None
+    return record
+
+
+def receipt_is_trustworthy(receipt: dict, live: dict[str, int]) -> tuple[bool, str]:
+    """Whether the receipt still describes this store, and why not if it does not.
+
+    Each entry records how many documents every database held *after* that dump.
+    If a database now holds fewer than the highest figure the receipt recalls,
+    something dropped data behind the receipt's back, and honouring it would skip
+    chunks and leave a hole - so the whole receipt is ignored for the run and the
+    dumps are re-ingested. Checked once per run: a few counts, not one per chunk.
+    """
+    for database, count in live.items():
+        recorded = max(
+            (
+                int(entry.get("documents", {}).get(database, 0))
+                for entry in receipt.values()
+                if isinstance(entry, dict)
+            ),
+            default=0,
+        )
+        if count < recorded:
+            return False, (
+                f"{database} holds {count} document(s) but the receipt records "
+                f"{recorded}: something dropped data since, so the receipt is "
+                "ignored and the dumps are ingested again"
+            )
+    return True, ""
+
+
+async def count_modules(
+    bx: BaseXClient, builder: QueryBuilder, config: Config, path: str
+) -> dict[str, dict[str, str]] | None:
+    """The count pass for one dump: every module, in a single query.
+
+    One parse of the file rather than one per module - see the module docstring.
+    None means the query answered nothing at all.
+    """
+    started = time.monotonic()
+    report = await bx.query_xml(
+        builder.module_counts_query(),
+        path=path,
+        moduleNames=",".join(module.name for module in config.modules),
+    )
+    if report is None:
+        print("the count pass answered nothing", file=sys.stderr)
+        return None
+    counts = {child.get("name", ""): dict(child.attrib) for child in report.findall("module")}
+    print(f"count pass: {len(counts)} module(s) in {time.monotonic() - started:.1f}s")
+    return counts
+
+
 async def ingest_one(
     bx: BaseXClient,
     config: Config,
@@ -159,21 +295,22 @@ async def ingest_one(
     path: str,
     args: argparse.Namespace,
     sizes: dict[str, int],
+    counts: dict[str, dict[str, str]],
 ) -> int:
-    """One dump: the count pass and then the write pass, module by module.
+    """One dump: the write pass, module by module, against the count pass already run.
 
-    `sizes` collects each module database's document count as it is seen, so the
-    batch can say what the databases hold at the end. That is deliberately not a
-    running total: `count_documents` is the whole database every time, so adding
+    `sizes` collects each module database's document count as it is written, so
+    the batch can say what the databases hold at the end. That is deliberately not
+    a running total: `count_documents` is the whole database every time, so adding
     it up per dump would count the first chunk 48 times.
     """
     for module in config.modules:
-        t0 = time.monotonic()
-        report = await bx.query_xml(
-            builder.module_count_query(), path=path, moduleName=module.name
-        )
+        report = counts.get(module.name)
         if report is None:
-            print(f"{module.name}: no report from the dump", file=sys.stderr)
+            # The count pass named every configured module; one missing means the
+            # report itself is not what this expects, not that the module is
+            # absent (which says present="false").
+            print(f"{module.name}: the count pass did not report it", file=sys.stderr)
             return 4
         present = report.get("present") == "true"
         items = int(report.get("items", "0"))
@@ -183,7 +320,7 @@ async def ingest_one(
         print(
             f"{module.name}: {items} record(s) "
             f"(server declared {declared or '?'}), {with_id} with an id "
-            f"-> {module.database} ({time.monotonic() - t0:.1f}s)"
+            f"-> {module.database}"
         )
         if undated:
             print(
@@ -270,6 +407,7 @@ async def run(args: argparse.Namespace) -> int:
         return 2
 
     sizes: dict[str, int] = {}
+    skipped = 0
     async with BaseXClient(
         config.basex.url,
         config.basex.user,
@@ -286,24 +424,95 @@ async def run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
 
+        # One receipt per directory the dumps came from: it travels with the
+        # chunks it names and says nothing about a directory it never saw. Read
+        # scoped to **these** databases, so a receipt written for another store
+        # cannot make this run skip a chunk it has never ingested.
+        databases = [module.database for module in config.modules]
+        receipts: dict[Path, dict] = {}
+        for dump in dumps:
+            if dump.parent in receipts:
+                continue
+            written = read_receipt(dump.parent)
+            scoped = receipt_dumps(written, databases)
+            if written and not scoped:
+                print(
+                    f"warning: {dump.parent / RECEIPT} describes other databases "
+                    f"({', '.join(str(n) for n in written.get('databases', [])) or '?'}) "
+                    "- ignored",
+                    file=sys.stderr,
+                )
+            receipts[dump.parent] = scoped
+        if args.reset:
+            # `--reset` drops each module database and rebuilds it from this one
+            # dump, so every other entry in the receipt describes records that
+            # are no longer there: the receipt starts over. (The trust check
+            # below would catch it on the next run anyway - saying it here is
+            # cheaper than re-ingesting 47 chunks to find out.)
+            for directory in receipts:
+                receipts[directory] = {}
+        if not args.force and any(receipts.values()):
+            live: dict[str, int] = {}
+            for module in config.modules:
+                live[module.database] = (
+                    await bx.count_documents(module.database)
+                    if await bx.database_exists(module.database)
+                    else 0
+                )
+            for directory, receipt in receipts.items():
+                if not receipt:
+                    continue
+                trustworthy, why = receipt_is_trustworthy(receipt, live)
+                if not trustworthy:
+                    print(f"warning: {directory / RECEIPT}: {why}", file=sys.stderr)
+                    # Started over rather than trusted: the received chunks in
+                    # this run are re-ingested, and the receipt is rebuilt from
+                    # what this run actually does.
+                    receipts[directory] = {}
+
         for number, dump in enumerate(dumps, start=1):
+            directory = dump.parent
+            receipt = receipts.setdefault(directory, {})
             if len(dumps) > 1:
                 print(f"[{number}/{len(dumps)}] {dump.name}")
+            if not args.force:
+                known = already_ingested(receipt, dump)
+                if known is not None:
+                    print(
+                        f"  already in the store (ingested {known.get('ingested', '?')}), "
+                        "skipped"
+                    )
+                    skipped += 1
+                    continue
             with unpacked(dump) as path:
-                code = await ingest_one(
-                    bx, config, builder, str(path.resolve()), args, sizes
-                )
+                resolved = str(path.resolve())
+                counts = await count_modules(bx, builder, config, resolved)
+                if counts is None:
+                    return 4
+                code = await ingest_one(bx, config, builder, resolved, args, sizes, counts)
             if code != 0:
                 # Stop at the first dump that failed: finishing the batch would
                 # write the rest and leave a store that is missing a chapter,
                 # with nothing on screen to say which one.
                 print(f"stopped at {dump.name}: nothing after it was read", file=sys.stderr)
                 return code
+            if not args.dry_run:
+                # Written after each dump, not at the end: that is the whole point
+                # of a receipt - an interrupted run resumes where it stopped.
+                stat = dump.stat()
+                receipt[dump.name] = {
+                    "size": stat.st_size,
+                    "modified": int(stat.st_mtime),
+                    "ingested": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "documents": dict(sizes),
+                }
+                write_receipt(directory, databases, receipt)
 
     if args.dry_run:
         print(f"dry run: nothing written ({len(dumps)} dump(s) counted)")
     elif sizes:
-        print(f"done: {len(dumps)} dump(s), additive. Stored now:")
+        tail = f", {skipped} already in the store" if skipped else ""
+        print(f"done: {len(dumps)} dump(s), additive{tail}. Stored now:")
         for database, count in sizes.items():
             print(f"  {database}: {count} document(s)")
     else:
@@ -322,6 +531,13 @@ def main() -> int:
     )
     parser.add_argument("-c", "--config", default="oai.toml")
     parser.add_argument("--dry-run", action="store_true", help="count only")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="ingest every dump even if the receipt beside it says it is already "
+        "in the store. The receipt is still updated: it is the record of what "
+        "has been done, not a switch.",
+    )
     parser.add_argument(
         "--reset",
         action="store_true",
