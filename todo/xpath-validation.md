@@ -41,9 +41,10 @@ is worth most.
    `identifier` / `datestamp` / each set expression over a sample record and report the hit counts.
    This catches the *matches-nothing* case, which is the real one. Needs BaseX at startup (the app
    already probes Saxon there) and one record per module.
-3. **Ingest-time census** — extend `module_count.xq.tmpl` (which already reports `items`, `withId`,
-   `undated`) with per-expression hit counts and print them. Cheapest, and the natural place; but it
-   only runs when someone ingests, not when someone edits the config and restarts.
+3. **Ingest-time census** — extend `module_counts.xq.tmpl` (which already reports `items`, `withId`,
+   `undated`, and answers for every module in one pass) with per-expression hit counts and print them.
+   Cheapest, and the natural place; but it only runs when someone ingests, not when someone edits the
+   config and restarts.
 4. **Nothing** — document harder. The current position.
 
 ## Recommendation

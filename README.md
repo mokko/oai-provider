@@ -58,6 +58,8 @@ python tools/ingest.py sdata/Dump.xml
 python tools/ingest.py sdata/                     # a directory: every chunk, in order
 python tools/ingest.py sdata/zips/*.zip           # the archives as they arrived: unpacked,
                                                   # ingested, and the unpacked copy deleted
+# A dump already in the store is skipped: a receipt beside the chunks says so, which is what
+# makes an interrupted import resumable. --force redoes it; --dry-run only counts.
 
 # Serve
 cp .env.example .env      # set OAI_BASE_URL to where a harvester reaches you
