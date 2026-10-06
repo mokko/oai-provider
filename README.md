@@ -8,9 +8,6 @@ hermes-agent and deepseek-v4.1 flash.
 
 ## Shape
 
-- **Generic XML in.** The provider never assumes a schema — which XPaths pull
-  `identifier` / `datestamp` / `sets` out of a record is configuration
-  (`oai.toml`).
 - **One document per record in BaseX**, under the wrapper the module layout
   expects; the source element is kept whole inside it.
 - **Namespaces are stripped on the way in, restored on the way out.** Module
@@ -60,6 +57,10 @@ python tools/ingest.py sdata/zips/*.zip           # the archives as they arrived
                                                   # ingested, and the unpacked copy deleted
 # A dump already in the store is skipped: a receipt beside the chunks says so, which is what
 # makes an interrupted import resumable. --force redoes it; --dry-run only counts.
+
+# While an ingest runs the provider stays up but is *very slow*: every verb that reads the
+# store queues behind the running write pass and can take tens of seconds per request
+# (only Identify and the other config-only verbs stay instant).
 
 # Serve
 cp .env.example .env      # set OAI_BASE_URL to where a harvester reaches you
