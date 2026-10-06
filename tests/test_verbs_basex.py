@@ -20,6 +20,9 @@ TEST_DB = "oai_provider_verbs"
 OAI_ERROR = q("error")
 OAI_HEADER = q("header")
 
+pytestmark = pytest.mark.integration
+
+
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")
@@ -393,7 +396,15 @@ def test_complete_list_size_and_cursor(cfg: Config) -> None:
     token_el = root.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
     # completeListSize is the size of the whole pinned result set, not the page
     assert token_el.get("completeListSize") == "3"
-    assert token_el.get("cursor") == "1"
+    # cursor is "the number of elements of the complete list thus far returned"
+    # - the count BEFORE the page, so the first page is 0, not the page size
+    assert token_el.get("cursor") == "0"
+
+    second = call(
+        small, ("verb", "ListIdentifiers"), ("resumptionToken", token_el.text)
+    )
+    second_el = second.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
+    assert second_el.get("cursor") == "1"
 
 
 def test_paging_with_payloads(cfg: Config) -> None:

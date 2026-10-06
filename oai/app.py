@@ -34,6 +34,10 @@ def create_app(config: Config, client: BaseXClient | None = None) -> Starlette:
         )
         await bx.__aenter__()
         state["client"] = bx
+        # One Provider per app, not per request: it builds a QueryBuilder whose
+        # rendered queries are cached, so rebuilding it on every request threw
+        # that cache away and re-read the templates from disk each time.
+        state["provider"] = Provider(config, bx)
         try:
             # Fail early, not on the first request that asks for it: a format
             # that needs Saxon must not be advertised by a server that cannot
@@ -59,8 +63,8 @@ def create_app(config: Config, client: BaseXClient | None = None) -> Starlette:
             form = await request.form()
             pairs += [(k, str(v)) for k, v in form.multi_items()]
 
-        provider = Provider(config, state["client"])  # type: ignore[arg-type]
-        root = await provider.handle(pairs)
+        provider = state["provider"]
+        root = await provider.handle(pairs)  # type: ignore[union-attr]
         return Response(
             serialise(root, config.protocol.pretty),
             media_type="text/xml; charset=utf-8",

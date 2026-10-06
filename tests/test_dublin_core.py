@@ -407,10 +407,50 @@ def test_the_person_date_is_the_primary_dated_entry(config: Config) -> None:
     assert "NotesClb" not in dates[0].xpath, "NotesClb is not a discriminator"
 
 
-def test_every_record_on_a_real_page_serves_a_title(live: Config) -> None:
-    """End to end against the module databases: the export titles every object,
-    so no record on a page may come back without a dc:title. The fixture cannot
-    prove this - it has no title field."""
+def _flat(value: str) -> str:
+    """Collapse runs of whitespace, so a value's embedded newlines are not the
+    thing under test."""
+    return " ".join(value.split())
+
+
+def _source_titles(live: Config, obj_ids: list[str]) -> dict[str, str]:
+    """The non-empty `ObjObjectTitleVrt` value for each id, straight from BaseX.
+
+    One query, against the same field the mapping reads, so the test checks the
+    served output against its *source* rather than against an assumption about
+    the data. Returned as elements, not as delimited text: a title value can
+    itself contain a newline, which a line-based reply would split.
+    """
+    obj = next(m for m in live.modules if m.name == "Object")
+    wanted = ",".join(f"'{i}'" for i in obj_ids if i)
+    if not wanted:
+        return {}
+
+    async def go() -> dict[str, str]:
+        async with _client(live) as bx:
+            nodes = await bx.query_nodes(
+                f"for $d in collection('{obj.database}')//moduleItem[@id = ({wanted})]\n"
+                "  let $v := $d//virtualField[@name='ObjObjectTitleVrt']"
+                "/value[normalize-space(.) ne ''][1]\n"
+                "  where $v\n"
+                '  return <t id="{string($d/@id)}">{string($v)}</t>'
+            )
+        return {(n.get("id") or ""): (n.text or "") for n in nodes}
+
+    return asyncio.run(go())
+
+
+@pytest.mark.integration
+def test_a_served_title_mirrors_its_source(live: Config) -> None:
+    """The served dc:title reflects the source field, in both directions.
+
+    "Every object has a title" was never true: the real export titles *most*
+    objects but at least one carries an empty `<value/>` for
+    `ObjObjectTitleVrt` (measured: object 1922446). The mapping is right to omit
+    a term whose source is empty, so the invariant that holds is the pair - a
+    non-empty source is always served, and an empty one never becomes a blank
+    `<dc:title/>`. The fixture cannot prove this: it has no title field.
+    """
     root = _call(
         live,
         ("verb", "ListRecords"),
@@ -419,16 +459,29 @@ def test_every_record_on_a_real_page_serves_a_title(live: Config) -> None:
     )
     records = root.findall(f"{q('ListRecords')}/{q('record')}")
     assert records, "no records served"
+    obj_ids = [
+        (r.findtext(f"{q('header')}/{q('identifier')}") or "").rsplit("-", 1)[-1]
+        for r in records
+    ]
+    source = _source_titles(live, obj_ids)
+
     for rec in records:
+        ident = rec.findtext(f"{q('header')}/{q('identifier')}") or ""
         md = rec.find(f"{q('metadata')}")
-        assert md is not None, "record served without metadata"
+        assert md is not None, f"{ident} served without metadata"
         dc = list(md)[0]
         titles = [
-            (c.text or "").strip()
-            for c in dc
-            if c.tag.split("}")[-1] == "title"
+            (c.text or "").strip() for c in dc if c.tag.split("}")[-1] == "title"
         ]
-        assert titles and all(titles), "a record was served without a dc:title"
+        assert all(titles), f"{ident}: a blank dc:title was served"
+        obj_id = ident.rsplit("-", 1)[-1]
+        if obj_id in source:
+            assert titles and _flat(titles[0]) == _flat(source[obj_id]), (
+                f"{ident}: source title {source[obj_id]!r} not served ({titles})"
+            )
+        else:
+            assert not titles, f"{ident}: no source title, yet one was served"
+
 
 
 # -- dc:creator: the role allow-list ---------------------------------------
@@ -503,6 +556,7 @@ def _creators(cfg: Config, identifiers: list[str]) -> dict[str, list[str]]:
         served[ident] = [v for term, v in _dc_of(root) if term == "creator"]
     return served
 
+@pytest.mark.integration
 def test_the_shipped_dc_creator_reads_the_role_not_the_display_order(
     live: Config,
 ) -> None:
@@ -572,6 +626,7 @@ SITTER_MAKER_ENGRAVER = """<application xmlns="http://www.zetcom.com/ria/ws/modu
 """
 
 
+@pytest.mark.integration
 def test_a_depicted_person_is_not_a_creator(live: Config, tmp_path) -> None:
     """The record that made this mapping necessary: its person associations are
     a depicted sitter, an engraver, and a maker - only the maker is a creator."""

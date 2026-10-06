@@ -24,6 +24,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "samples" / "ria-dump.xml"
 TEST_DB = "oai_provider_http"
 
+pytestmark = pytest.mark.integration
+
+
 
 def base_config() -> Config:
     cfg = Config.load(ROOT / "oai.toml")

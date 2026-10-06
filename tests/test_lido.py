@@ -222,6 +222,7 @@ def _call(config: Config, *pairs: tuple[str, str]):
     return asyncio.run(go())
 
 
+@pytest.mark.integration
 def test_saxon_is_available_here(live: Config) -> None:
     """The probe the app uses at startup to decide it can serve a stylesheet
     format at all."""
@@ -233,18 +234,39 @@ def test_saxon_is_available_here(live: Config) -> None:
     assert asyncio.run(go()) == ""
 
 
+def _store_total(config: Config) -> int:
+    """Every document across the configured modules.
+
+    Read from the store rather than hard-coded: the number grows with each
+    chunk ingested, and a frozen expectation turns a data change into a red
+    test that says nothing about the provider.
+    """
+
+    async def go() -> int:
+        async with _client(config) as bx:
+            return sum(
+                [await bx.count_documents(m.database) for m in config.modules]
+            )
+
+    return asyncio.run(go())
+
+
+@pytest.mark.integration
 def test_list_identifiers_as_lido_is_the_object_set(live: Config) -> None:
     root = _call(live, ("verb", "ListIdentifiers"), ("metadataPrefix", "lido"))
     headers = root.findall(f"{q('ListIdentifiers')}/{q('header')}")
     assert headers, "no rows"
     ids = [h.find(q("identifier")).text for h in headers]
     assert all(i.startswith("spk-berlin.de:object-") for i in ids)
-    # and the raw store still spans all three modules
+    # and the raw store still spans all three modules: the unfiltered format
+    # reports every document in every module as its complete list size
     ria = _call(live, ("verb", "ListIdentifiers"), ("metadataPrefix", "ria"))
     tok = ria.find(f"{q('ListIdentifiers')}/{q('resumptionToken')}")
-    assert int(tok.get("completeListSize")) == 5884
+    assert tok is not None, "no resumptionToken on an unpaged harvest"
+    assert int(tok.get("completeListSize")) == _store_total(live)
 
 
+@pytest.mark.integration
 def test_get_record_as_lido(live: Config) -> None:
     ident = "spk-berlin.de:object-935894"
     root = _call(
@@ -276,6 +298,7 @@ def test_get_record_as_lido(live: Config) -> None:
     # which is why it is not asserted unconditionally
 
 
+@pytest.mark.integration
 def test_the_raw_payload_is_untouched_by_having_asked_for_lido(live: Config) -> None:
     """LIDO is a view: the stored payload is still served verbatim as `ria`."""
     root = _call(

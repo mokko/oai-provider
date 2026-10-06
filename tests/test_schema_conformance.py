@@ -24,8 +24,6 @@ must find a **global** element declaration for the payload.
 
 from __future__ import annotations
 
-import asyncio
-import dataclasses
 import re
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -34,9 +32,12 @@ import pytest
 
 xmlschema = pytest.importorskip("xmlschema")
 
-from oai.basex import BaseXClient  # noqa: E402
 from oai.config import Config  # noqa: E402
-from oai.protocol import Provider, q, serialise  # noqa: E402
+from oai.protocol import q, serialise  # noqa: E402
+
+import support  # noqa: E402
+
+pytestmark = pytest.mark.integration
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -69,41 +70,23 @@ def _oai_schema(*, resolve_payload: bool):
     return xmlschema.XMLSchema(text, locations=LOCATIONS)
 
 
-def _client(config: Config) -> BaseXClient:
-    return BaseXClient(
-        config.basex.url, config.basex.user, config.basex.password, config.basex.timeout
-    )
+def _serve(config: Config, *pairs: tuple[str, str]) -> bytes:
+    """The exact bytes a request produces."""
+    return serialise(support.serve(config, *pairs))
 
 
 @pytest.fixture(scope="module")
-def live() -> Config:
-    """The shipped config, page size 1 — validation is slow, one record is enough."""
-    cfg = Config.load(ROOT / "oai.toml")
+def live(object_store: Config) -> Config:
+    """A scratch Object store at page size 1 - validation is slow, one record
+    is enough.
 
-    async def check() -> bool:
-        async with _client(cfg) as bx:
-            return await bx.ping()
+    Deliberately **not** the shipped `sync_*` store. The first page asks for
+    `completeListSize`, which counts the whole result set, and against a real
+    export that is tens of seconds per case - so a test that only needs one
+    record must not read the whole repository to get it.
+    """
+    return support.with_page_size(object_store, 1)
 
-    try:
-        ok = asyncio.run(check())
-    except Exception:
-        ok = False
-    if not ok:
-        pytest.skip("BaseX is not answering")
-    return dataclasses.replace(
-        cfg, protocol=dataclasses.replace(cfg.protocol, page_size=1)
-    )
-
-
-def _serve(config: Config, *pairs: tuple[str, str]) -> bytes:
-    """The exact bytes a request produces."""
-
-    async def run() -> bytes:
-        async with _client(config) as bx:
-            root = await Provider(config, bx).handle(list(pairs))
-        return serialise(root)
-
-    return asyncio.run(run())
 
 
 @pytest.fixture(scope="module")

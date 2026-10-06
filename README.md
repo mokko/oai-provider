@@ -149,8 +149,17 @@ byte-identical either way — and off by default (compact is the wire format).
 ## Test
 
 ```bash
-./.venv/bin/python -m pytest tests/ -q   # the BaseX-backed ones skip if it's down
+./.venv/bin/python -m pytest tests/ -q                 # everything
+./.venv/bin/python -m pytest -m "not integration" -q    # no BaseX needed, ~3 s
 ```
+
+The suite splits by need. Most of it is pure Python — the protocol, the mapping
+and the ingest logic — and runs anywhere. The `integration` tests need a live
+BaseX and a **scratch** database: they seed one from `samples/ria-dump.xml`,
+reuse it, and drop it, rather than reading the real `sync_*` store (a test that
+reads a real export is neither hermetic nor fast). They skip themselves when
+BaseX is down, so a bare `pytest` is still runnable on a laptop with nothing
+installed.
 
 Responses are also checked for **schema conformance**, not just well-formedness:
 `tests/test_schema_conformance.py` validates them against the vendored

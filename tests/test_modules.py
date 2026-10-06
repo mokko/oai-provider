@@ -181,6 +181,7 @@ def _run(config: Config, coro):
     return asyncio.run(go())
 
 
+@pytest.mark.integration
 def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> None:
     builder = QueryBuilder(live.modules, live.timezone_offset)
 
@@ -214,6 +215,7 @@ def test_ingest_a_module_and_ready_it_back_the_colleagues_way(live: Config) -> N
     assert value, "the ingested records should carry an object number"
 
 
+@pytest.mark.integration
 def test_the_count_reports_records_without_a_usable_datestamp(live: Config, tmp_path) -> None:
     """A record the serve query cannot datestamp is dropped from the repository
     silently; the count pass must surface it, or an operator never learns."""

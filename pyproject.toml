@@ -11,3 +11,10 @@ web = ["starlette>=0.37", "uvicorn>=0.30", "python-multipart>=0.0.9"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests that need a live BaseX are marked, so the pure-Python core can be run
+# alone and quickly: `pytest -m "not integration"`. Marked tests skip
+# themselves when BaseX is down, so a bare `pytest` is still runnable anywhere.
+markers = [
+    "integration: requires a running BaseX (skips itself when it is unavailable)",
+]
+

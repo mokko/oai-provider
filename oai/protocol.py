@@ -99,6 +99,12 @@ _XML_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
 MAX_ARG_LEN = 512
 MAX_TOKEN_LEN = 4096
 
+# A request has at most seven meaningful arguments (verb plus the six the
+# spec defines). No legitimate harvester sends dozens, so a cap here is not a
+# behaviour change - it only stops a client from making the server bind and
+# validate an unbounded number of pairs.
+MAX_ARGS = 64
+
 
 def q(name: str) -> str:
     return f"{{{OAI_NS}}}{name}"
@@ -213,10 +219,21 @@ def parse_args(pairs: list[tuple[str, str]]) -> Request:
     are supposed to send exactly one of either.
     """
     seen: dict[str, str] = {}
+    if len(pairs) > MAX_ARGS:
+        raise ProtocolError(
+            "badArgument", f"too many arguments (max {MAX_ARGS})"
+        )
     for key, value in pairs:
         if key in seen:
             raise ProtocolError(
                 "badArgument", f"repeated argument: {key}"
+            )
+        if len(key) > MAX_ARG_LEN:
+            # a name is echoed into <request> as an attribute, so an unbounded
+            # one is unbounded output even when its value is capped
+            raise ProtocolError(
+                "badArgument",
+                f"argument name is too long (max {MAX_ARG_LEN} characters)",
             )
         if key != "resumptionToken" and len(value) > MAX_ARG_LEN:
             raise ProtocolError(
@@ -275,6 +292,26 @@ def _b64e(raw: bytes) -> str:
 def _b64d(text: str) -> bytes:
     pad = "=" * (-len(text) % 4)
     return base64.urlsafe_b64decode(text + pad)
+
+
+def _token_str(value: object) -> str:
+    """A token field as text. Anything absent or non-text becomes ""."""
+    return value if isinstance(value, str) else ""
+
+
+def _token_int(value: object, what: str) -> int:
+    """A token field as an integer, or badResumptionToken.
+
+    A JSON payload can carry any type here; `int()` on a dict or a non-numeric
+    string raises, which would surface as an unhandled error rather than the
+    loud rejection a bad token deserves.
+    """
+    if value is None:
+        return 0
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise TokenError(f"token field {what} is not an integer") from exc
 
 
 @dataclass
@@ -347,6 +384,13 @@ def decode_token(token: str, secret: str, fingerprint: str, ttl: int) -> TokenSt
     except Exception as exc:  # noqa: BLE001 - any malformed token is the same
         raise TokenError(f"token is malformed ({exc})") from exc
 
+    # The body is attacker-supplied bytes that happen to be valid JSON. `null`,
+    # `[]`, `0` and `"x"` all decode, and the field reads below would then raise
+    # AttributeError/TypeError - an unhandled 500 where the harvester deserves a
+    # badResumptionToken. Reject anything that is not an object first.
+    if not isinstance(payload, dict):
+        raise TokenError("token payload is not an object")
+
     if payload.get("v") != TOKEN_VERSION:
         raise TokenError(f"token version {payload.get('v')!r} is not supported")
     if payload.get("fp") != fingerprint:
@@ -355,22 +399,23 @@ def decode_token(token: str, secret: str, fingerprint: str, ttl: int) -> TokenSt
             "arguments no longer mean the same result set, so restart the "
             "harvest"
         )
-    issued = payload.get("iss") or 0
+    issued = _token_int(payload.get("iss"), "issued-at")
     if ttl and time.time() - issued > ttl:
         raise TokenError("token has expired; restart the harvest")
 
     return TokenState(
         fingerprint=payload["fp"],
-        pinned_until=payload.get("u", ""),
-        last_datestamp=payload.get("ds", ""),
-        last_identifier=payload.get("id", ""),
-        prefix=payload.get("p", ""),
+        pinned_until=_token_str(payload.get("u")),
+        last_datestamp=_token_str(payload.get("ds")),
+        last_identifier=_token_str(payload.get("id")),
+        prefix=_token_str(payload.get("p")),
         issued_at=issued,
-        delivered=int(payload.get("c", 0)),
-        complete_list_size=int(payload.get("n", 0)),
-        set_spec=payload.get("s", ""),
-        from_=payload.get("f", ""),
+        delivered=_token_int(payload.get("c"), "cursor"),
+        complete_list_size=_token_int(payload.get("n"), "completeListSize"),
+        set_spec=_token_str(payload.get("s")),
+        from_=_token_str(payload.get("f")),
     )
+
 
 
 # --------------------------------------------------------------------------
@@ -408,10 +453,11 @@ def make_request_el(base_url: str, pairs: list[tuple[str, str]]) -> ET.Element:
     """
     el = ET.Element(q("request"))
     for key, value in pairs:
-        if _XML_NAME.match(key):
+        if len(key) <= MAX_ARG_LEN and _XML_NAME.match(key):
             el.set(key, value)
     el.text = base_url
     return el
+
 
 
 def header_el(row: ET.Element) -> ET.Element:
@@ -708,6 +754,12 @@ class Provider:
 
         at_end = not page.has_more
         if page.rows:
+            # `cursor` is "a count of the number of elements of the complete
+            # list thus far returned" (the spec's words), i.e. the count BEFORE
+            # this page - so it starts at 0 and advances by a page each time.
+            # Using the count *after* the page put every cursor one page ahead
+            # of itself (and made the first page claim non-zero).
+            cursor = delivered
             delivered += len(page.rows)
             if at_end:
                 # empty token element signals completion
@@ -715,7 +767,7 @@ class Provider:
                     node,
                     "resumptionToken",
                     completeListSize=str(total),
-                    cursor=str(max(delivered - len(page.rows), 0)),
+                    cursor=str(cursor),
                 ).text = None
             else:
                 state = TokenState(
@@ -734,7 +786,7 @@ class Provider:
                     node,
                     "resumptionToken",
                     completeListSize=str(total),
-                    cursor=str(delivered),
+                    cursor=str(cursor),
                 ).text = encode_token(state, self.config.protocol.token_secret)
         return node
 

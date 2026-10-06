@@ -172,6 +172,12 @@ class QueryBuilder:
         self.modules = tuple(modules)
         self.timezone_offset = timezone_offset
         self.template_dir = Path(template_dir)
+        # Rendered query text is a pure function of the builder's configuration,
+        # and the templates are read from disk. A Provider builds one builder,
+        # so caching here turns the per-request render (a file read plus a lot
+        # of string splicing) into a dict lookup - see page_query/record_query.
+        self._rendered: dict[tuple[str, str], str] = {}
+        self._fingerprint: str | None = None
 
     def modules_for(self, fmt=None) -> tuple:
         """The modules a request actually spans.
@@ -592,15 +598,30 @@ class QueryBuilder:
             raise ValueError(f"unsubstituted placeholder near: {leftover!r}")
         return text
 
+    def _cached_render(self, template: str, fmt=None) -> str:
+        """`render`, memoised per (template, format).
+
+        The key is the format's prefix, or "" for the format-less templates:
+        within one builder a prefix identifies its format, and the rest of the
+        query depends only on the builder's own configuration. The output is
+        byte-identical to an uncached render, which a test pins.
+        """
+        key = (template, fmt.prefix if fmt is not None else "")
+        text = self._rendered.get(key)
+        if text is None:
+            text = self.render(template, fmt=fmt)
+            self._rendered[key] = text
+        return text
+
     def page_query(self, fmt=None) -> str:
-        return self.render("page.xq.tmpl", fmt=fmt)
+        return self._cached_render("page.xq.tmpl", fmt)
 
     def record_query(self, fmt=None) -> str:
-        return self.render("record.xq.tmpl", fmt=fmt)
+        return self._cached_render("record.xq.tmpl", fmt)
 
     def module_ingest_query(self) -> str:
         """Ingest one module into its own database (see the template)."""
-        return self.render("module_ingest.xq.tmpl")
+        return self._cached_render("module_ingest.xq.tmpl")
 
     def module_counts_query(self) -> str:
         """Read-only record counts for **every** module of one dump.
@@ -610,7 +631,7 @@ class QueryBuilder:
         1000 records or 44. The report is a `<modules>` element with one
         `<module>` child per name, in the order given.
         """
-        return self.render("module_counts.xq.tmpl")
+        return self._cached_render("module_counts.xq.tmpl")
 
     def fingerprint(self) -> str:
         """A digest of the mapping, so a resumption token issued under one
@@ -619,6 +640,8 @@ class QueryBuilder:
         Changing this is exactly the case the token fingerprint exists to
         catch: the same request arguments stop meaning the same result set.
         """
+        if self._fingerprint is not None:
+            return self._fingerprint
         parts = [self.timezone_offset]
         for module in self.modules:
             parts += [
@@ -631,4 +654,8 @@ class QueryBuilder:
             ]
             parts += [f"{r.spec}|{r.xpath}" for r in module.sets]
             parts += [f"{t.term}|{t.xpath}|{t.literal}" for t in module.terms]
-        return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
+        self._fingerprint = hashlib.sha256(
+            "\n".join(parts).encode("utf-8")
+        ).hexdigest()[:16]
+        return self._fingerprint
+
